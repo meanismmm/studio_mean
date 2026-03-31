@@ -1,4 +1,4 @@
-// ===== quiz.js — 퀴즈 숏츠 자동화 =====
+// ===== quiz.js =====
 
 let currentQuiz = null;
 
@@ -15,44 +15,44 @@ async function generateQuiz() {
     psychology: '심리테스트 (선택지형)', common: '상식 퀴즈',
     nonsense: '넌센스·수수께끼'
   };
-  const diffMap = { easy: '쉬움 (누구나 맞출 수 있는)', normal: '보통', hard: '어려움 (생각해야 풀 수 있는)' };
+  const diffMap = { easy: '쉬움', normal: '보통', hard: '어려움' };
   const isKo = lang === 'ko';
 
   try {
     const result = await callClaude(
-      `당신은 유튜브 숏츠 퀴즈 콘텐츠 전문가입니다. 반드시 순수 JSON만 반환하세요.`,
+      '당신은 유튜브 숏츠 퀴즈 콘텐츠 전문가입니다. 반드시 순수 JSON만 반환하세요.',
       `카테고리: ${catMap[category]}
 난이도: ${diffMap[difficulty]}
 언어: ${isKo ? '한국어' : 'English'}
 
-유튜브 숏츠에서 조회수가 잘 나오는 ${isKo ? '한국어' : 'English'} 퀴즈를 하나 만들어주세요.
-레퍼런스 스타일: "미국 대학 입시 문제" 같은 자극적인 타이틀 + 간결한 문제 + 반전있는 답
+유튜브 숏츠에서 조회수가 잘 나오는 퀴즈를 하나 만들어주세요.
+나레이션은 실제로 읽었을 때 자연스럽고 흥미롭게, 구어체로 작성하세요.
 
-JSON 형식:
+JSON:
 {
-  "hookTitle": "${isKo ? '영상 상단에 들어갈 자극적인 타이틀 (예: 미국 대학 입시 문제)' : 'viral hook title'}",
-  "question": "${isKo ? '문제 텍스트' : 'question text'}",
-  "options": ["${isKo ? '선택지1 (객관식인 경우, 없으면 빈 배열)' : 'option1'}"],
-  "answer": "${isKo ? '정답' : 'answer'}",
-  "explanation": "${isKo ? '해설 (왜 이게 답인지 흥미롭게)' : 'explanation'}",
+  "hookTitle": "자극적인 타이틀",
+  "question": "문제 텍스트",
+  "options": ["선택지1","선택지2","선택지3"],
+  "answer": "정답",
+  "explanation": "해설",
   "difficulty": "${difficulty}",
   "narration": {
-    "intro": "${isKo ? '오프닝 나레이션 (2-3문장, 흥미 유발)' : 'opening narration'}",
-    "question": "${isKo ? '문제 읽어주는 나레이션' : 'question narration'}",
-    "countdown": "${isKo ? '카운트다운 멘트 (예: 자, 생각해볼까요? 5...4...3...2...1...)' : 'countdown narration'}",
-    "answer": "${isKo ? '정답 발표 나레이션' : 'answer narration'}",
-    "outro": "${isKo ? '아웃트로 CTA (구독 유도)' : 'outro CTA'}"
+    "intro": "오프닝 나레이션 (2~3문장, 흥미 유발, 구어체)",
+    "question": "문제 읽어주는 나레이션 (문제를 그대로 읽되 자연스럽게)",
+    "countdown": "카운트다운 멘트 (예: 자, 생각해볼까요? 5...4...3...2...1...)",
+    "answer": "정답 발표 나레이션 (정답 + 짧은 해설)",
+    "outro": "아웃트로 CTA (구독/팔로우 유도, 1~2문장)"
   },
   "captions": {
-    "hook": "${isKo ? '훅 자막' : 'hook caption'}",
-    "question": "${isKo ? '문제 자막' : 'question caption'}",
-    "countdown": "${isKo ? '카운트다운 자막 (숫자)' : 'countdown caption'}",
-    "answer": "${isKo ? '정답 자막' : 'answer caption'}",
-    "cta": "${isKo ? '구독 유도 자막' : 'CTA caption'}"
+    "hook": "훅 자막",
+    "question": "문제 자막 (짧게 요약)",
+    "countdown": "5  4  3  2  1",
+    "answer": "정답 자막",
+    "cta": "구독 유도 자막"
   },
-  "hashtags": ${isKo ? '["#퀴즈", "#수학퀴즈", "#두뇌테스트", "#IQ테스트", "#숏츠"]' : '["#quiz", "#brainteaser", "#mathpuzzle", "#shorts", "#viral"]'}
+  "hashtags": ["#퀴즈","#두뇌테스트","#숏츠","#IQ테스트","#수학퀴즈"]
 }`,
-      1000
+      1200
     );
 
     const clean = result.replace(/```json|```/g, '').trim();
@@ -66,96 +66,82 @@ JSON 형식:
 }
 
 function renderQuiz(quiz, lang) {
-  const isKo = lang === 'ko';
   const output = document.getElementById('quizOutput');
+  const n = quiz.narration || {};
+
+  // 나레이션 전문
+  const fullNarration =
+    `[오프닝] ${n.intro || ''}\n\n[문제] ${n.question || ''}\n\n[카운트다운] ${n.countdown || ''}\n\n[정답] ${n.answer || ''}\n\n[아웃트로] ${n.outro || ''}`;
+
+  // CapCut 편집 가이드
+  const scenes = [
+    { name: '오프닝',     time: '0:00 ~ 0:03', duration: '3초',  screen: '다크 배경 + 훅 타이틀 텍스트',       caption: quiz.captions?.hook || '',    transition: '페이드인' },
+    { name: '문제',       time: '0:03 ~ 0:18', duration: '15초', screen: '흰 배경 + 문제 텍스트 + 선택지',    caption: quiz.captions?.question || '', transition: '슬라이드 업' },
+    { name: '카운트다운', time: '0:18 ~ 0:23', duration: '5초',  screen: '다크 배경 + 숫자 카운트 5→1',       caption: '5  4  3  2  1',               transition: '플래시 컷' },
+    { name: '정답',       time: '0:23 ~ 0:33', duration: '10초', screen: '흰 배경 + 정답 강조 + 해설 텍스트', caption: quiz.captions?.answer || '',   transition: '페이드인' },
+    { name: 'CTA',        time: '0:33 ~ 0:37', duration: '4초',  screen: '다크 배경 + 구독/팔로우 텍스트',    caption: quiz.captions?.cta || '',      transition: '페이드아웃' },
+  ];
+
+  const capcut = scenes.map(s =>
+    `[${s.name}] ${s.time} (${s.duration})\n화면: ${s.screen}\n자막: ${s.caption}\n전환: ${s.transition}`
+  ).join('\n\n');
+
+  const fullCopy =
+    `━━━ 나레이션 전문 ━━━\n${fullNarration}\n\n━━━ CapCut 편집 가이드 ━━━\n${capcut}\n\n━━━ 해시태그 ━━━\n${(quiz.hashtags||[]).join(' ')}`;
 
   output.innerHTML = `
     <div class="quiz-section">
       <div class="quiz-label">훅 타이틀</div>
-      <div class="quiz-content" style="font-size:18px;color:#ffd166">🎬 ${quiz.hookTitle}</div>
+      <div class="quiz-content" style="font-size:18px;color:#ffd166">${quiz.hookTitle}</div>
     </div>
     <div class="quiz-section">
-      <div class="quiz-label">${isKo ? '문제' : 'Question'}</div>
+      <div class="quiz-label">문제</div>
       <div class="quiz-content">${quiz.question}</div>
-      ${quiz.options?.length ? `<div style="margin-top:8px;color:#7a7a8c;font-size:13px">${quiz.options.join(' / ')}</div>` : ''}
+      ${quiz.options?.length ? `<div style="margin-top:8px;color:#7a7a8c;font-size:13px;line-height:1.8">${quiz.options.map((o,i)=>['A','B','C','D'][i]+'. '+o).join('<br>')}</div>` : ''}
     </div>
     <div class="quiz-section">
-      <div class="quiz-label">${isKo ? '정답' : 'Answer'}</div>
-      <div class="quiz-answer">✅ ${quiz.answer}</div>
-    </div>
-    <div class="quiz-section">
-      <div class="quiz-label">${isKo ? '해설' : 'Explanation'}</div>
-      <div class="quiz-explanation">${quiz.explanation}</div>
-    </div>
-    <div class="quiz-section">
-      <div class="quiz-label">${isKo ? '해시태그' : 'Hashtags'}</div>
-      <div style="font-size:12px;color:#5b7fff">${(quiz.hashtags || []).join(' ')}</div>
-    </div>
-  `;
+      <div class="quiz-label">정답</div>
+      <div class="quiz-answer" style="color:#4ecdc4">✅ ${quiz.answer}</div>
+      <div class="quiz-explanation" style="margin-top:4px">${quiz.explanation}</div>
+    </div>`;
 
-  // 나레이션 세팅
+  // 나레이션 박스
   const narEl = document.getElementById('quizNarrationText');
-  const narration = quiz.narration;
-  narEl.textContent = `[오프닝] ${narration.intro}\n\n[문제] ${narration.question}\n\n[카운트다운] ${narration.countdown}\n\n[정답] ${narration.answer}\n\n[아웃트로] ${narration.outro}`;
-  document.getElementById('quizNarrationBox').style.display = 'block';
+  if (narEl) {
+    narEl.textContent = fullNarration;
+    document.getElementById('quizNarrationBox').style.display = 'block';
+  }
+
+  // CapCut 가이드 박스 동적 추가
+  let guideBox = document.getElementById('capcutGuideBox');
+  if (!guideBox) {
+    guideBox = document.createElement('div');
+    guideBox.id = 'capcutGuideBox';
+    guideBox.className = 'narration-box';
+    document.getElementById('quizResult').appendChild(guideBox);
+  }
+  guideBox.innerHTML = `
+    <div class="card-title" style="margin-bottom:10px">
+      CapCut 편집 가이드
+      <button class="btn-sm btn-accent" onclick="copyCapcutAll()">전체 복사</button>
+    </div>
+    <div style="font-size:13px;color:#e8e8f0;line-height:2">
+      ${scenes.map(s => `
+        <div style="padding:10px 0;border-bottom:1px solid #2a2a32">
+          <span style="color:#4ecdc4;font-weight:700">[${s.name}]</span>
+          <span style="color:#7a7a8c;margin-left:8px">${s.time} · ${s.duration}</span><br>
+          <span style="color:#7a7a8c">화면:</span> ${s.screen}<br>
+          <span style="color:#7a7a8c">자막:</span> ${s.caption}<br>
+          <span style="color:#7a7a8c">전환:</span> ${s.transition}
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#5b7fff">${(quiz.hashtags||[]).join(' ')}</div>`;
+
+  window._fullCopy = fullCopy;
+  window.copyCapcutAll = function() {
+    navigator.clipboard.writeText(window._fullCopy).then(() => showToast('전체 복사됨!'));
+  };
 
   document.getElementById('quizResult').style.display = 'block';
   document.getElementById('actionsStatus').style.display = 'none';
-}
-
-// GitHub Actions 트리거 — 퀴즈 영상 렌더링
-async function triggerGithubActions() {
-  if (!currentQuiz) { showToast('먼저 퀴즈를 생성해주세요'); return; }
-
-  const token = localStorage.getItem('GITHUB_TOKEN');
-  const repo = localStorage.getItem('GITHUB_REPO') || 'meanismmm/studio_mean';
-
-  if (!token) { showToast('GitHub 토큰을 설정 탭에서 입력해주세요'); return; }
-
-  const btn = document.getElementById('actionsBtn');
-  btn.disabled = true;
-  const statusBox = document.getElementById('actionsStatus');
-  statusBox.style.display = 'block';
-  statusBox.className = 'status-box running';
-  statusBox.textContent = '⏳ GitHub Actions 트리거 중...';
-
-  try {
-    const [owner, repoName] = repo.split('/');
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repoName}/dispatches`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github.v3+json'
-        },
-        body: JSON.stringify({
-          event_type: 'render_quiz',
-          client_payload: {
-            quiz: currentQuiz,
-            timestamp: new Date().toISOString()
-          }
-        })
-      }
-    );
-
-    if (response.status === 204) {
-      statusBox.className = 'status-box success';
-      statusBox.innerHTML = `✅ GitHub Actions 트리거 성공!<br>
-        <a href="https://github.com/${repo}/actions" target="_blank" 
-           style="color:#4ecdc4;font-size:11px;margin-top:4px;display:inline-block">
-          → Actions 탭에서 진행 상황 확인
-        </a><br>
-        <span style="font-size:11px;opacity:0.7">완료 후 Artifacts에서 mp4 다운로드 가능</span>`;
-    } else {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${response.status}`);
-    }
-  } catch(e) {
-    statusBox.className = 'status-box error';
-    statusBox.textContent = '❌ 오류: ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
 }
