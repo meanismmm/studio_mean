@@ -16,7 +16,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg fonts-noto-cjk wget
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
           fc-cache -fv
 
       - name: Install Python deps
@@ -36,13 +36,13 @@ jobs:
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
           key = os.environ.get('GCP_TTS_KEY','')
-          print(f"TTS key present: {bool(key)} len={len(key)}")
+          print(f"TTS key: {bool(key)}")
           if not key:
               open('narration.mp3','wb').close()
               sys.exit(0)
           n = quiz.get('narration',{})
           text = ' '.join([n.get(k,'') for k in ['intro','question','countdown','answer','outro'] if n.get(k)])
-          print(f"Narration length: {len(text)}")
+          print(f"Text length: {len(text)}")
           resp = requests.post(
               f'https://texttospeech.googleapis.com/v1/text:synthesize?key={key}',
               json={
@@ -61,82 +61,32 @@ jobs:
               open('narration.mp3','wb').close()
           EOF
 
-      - name: Download BGM via Pixabay
-        env:
-          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      - name: Generate BGM with FFmpeg
         run: |
           python3 << 'EOF'
-          import json, requests, os, sys
-
+          import json
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
-
-          key = os.environ.get('PIXABAY_API_KEY','')
-          print(f"Pixabay key: {bool(key)}")
-          if not key:
-              open('bgm.mp3','wb').close()
-              sys.exit(0)
-
+          diff = quiz.get('difficulty','normal')
           hook = quiz.get('hookTitle','')
           bright = any(k in hook for k in ['심리','상식','넌센스','쉬움'])
-          query = 'upbeat fun game show' if bright else 'suspense mystery tension'
-          print(f"BGM query: {query}")
-
-          # Pixabay Music API
-          resp = requests.get(
-              'https://pixabay.com/api/music/',
-              params={'key':key, 'q':query, 'per_page':10, 'order':'popular'},
-              timeout=15
-          )
-          print(f"Pixabay status: {resp.status_code}")
-          if not resp.ok:
-              print(f"Pixabay error: {resp.text[:300]}")
-              open('bgm.mp3','wb').close()
-              sys.exit(0)
-
-          data = resp.json()
-          print(f"Total hits: {data.get('totalHits',0)}")
-          hits = data.get('hits',[])
-
-          downloaded = False
-          for hit in hits[:8]:
-              # Pixabay music API의 오디오 URL 필드
-              audio_url = None
-              for field in ['audio','audioUrl','audio_url','url','previewUrl']:
-                  val = hit.get(field)
-                  if val and isinstance(val, str) and val.startswith('http'):
-                      audio_url = val
-                      break
-              print(f"Hit: {hit.get('title','?')} url={audio_url}")
-              if not audio_url:
-                  continue
-              try:
-                  r = requests.get(audio_url, timeout=20, headers={'User-Agent':'Mozilla/5.0'})
-                  if r.ok and len(r.content) > 10000:
-                      open('bgm.mp3','wb').write(r.content)
-                      print(f"BGM OK: {len(r.content)} bytes from {audio_url}")
-                      downloaded = True
-                      break
-              except Exception as e:
-                  print(f"Download fail: {e}")
-
-          if not downloaded:
-              print("BGM download failed - generating tone via FFmpeg")
-              open('bgm.mp3','wb').close()
+          # 분위기별 파라미터
+          if bright:
+              expr = "0.06*sin(2*PI*261*t)+0.04*sin(2*PI*329*t)+0.03*sin(2*PI*392*t)+0.02*sin(2*PI*523*t)"
+          else:
+              expr = "0.07*sin(2*PI*55*t)+0.04*sin(2*PI*82*t)+0.02*sin(2*PI*110*t)+0.01*sin(2*PI*138*t)"
+          print(f"BGM mood: {'bright' if bright else 'mystery'}")
+          with open('bgm_expr.txt','w') as f:
+              f.write(expr)
           EOF
 
-      - name: Generate fallback BGM tone
-        run: |
-          if [ ! -s bgm.mp3 ]; then
-            echo "Generating synthetic BGM tone..."
-            # 간단한 주기적 비프음 배경 생성 (저음 드론)
-            ffmpeg -f lavfi \
-              -i "aevalsrc=0.08*sin(2*PI*55*t)+0.05*sin(2*PI*110*t)+0.03*sin(2*PI*165*t):s=44100" \
-              -t 37 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
-            echo "Fallback BGM generated: $(du -h bgm.mp3)"
-          else
-            echo "BGM already available: $(du -h bgm.mp3)"
-          fi
+          EXPR=$(cat bgm_expr.txt)
+          echo "Generating BGM..."
+          ffmpeg -f lavfi \
+            -i "aevalsrc=${EXPR}:s=44100" \
+            -af "afade=t=in:st=0:d=2,afade=t=out:st=35:d=2" \
+            -t 37 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
+          echo "BGM generated: $(du -h bgm.mp3)"
 
       - name: Render frames
         run: |
@@ -172,7 +122,7 @@ jobs:
                       except: pass
               return ImageFont.load_default()
 
-          def center(draw, text, y, font, color, max_w=920, spacing=12):
+          def center(draw, text, y, font, color, max_w=940, spacing=12):
               if not text: return y
               words = text.split()
               lines, cur = [], ''
@@ -184,20 +134,24 @@ jobs:
               if cur: lines.append(cur)
               for line in lines:
                   bb = draw.textbbox((0,0),line,font=font)
-                  draw.text(((W-(bb[2]-bb[0]))//2, y), line, font=font, fill=color)
+                  tw = bb[2]-bb[0]
+                  draw.text(((W-tw)//2, y), line, font=font, fill=color)
                   y += bb[3]-bb[1]+spacing
               return y
 
           def base(accent=ACCENT):
               img = Image.new('RGB',(W,H),BG)
               d = ImageDraw.Draw(img)
-              d.rectangle([0,0,W,8], fill=accent)
-              d.rectangle([0,H-8,W,H], fill=accent)
+              # 상단 바
+              d.rectangle([0,0,W,10], fill=accent)
+              # 하단 바
+              d.rectangle([0,H-10,W,H], fill=accent)
               return img, d
 
-          def card(d, x1,y1,x2,y2, r=24, fill=CARD, top=None):
+          def card(d, x1,y1,x2,y2, r=20, fill=CARD, top_color=None):
               d.rounded_rectangle([x1,y1,x2,y2], radius=r, fill=fill)
-              if top: d.rectangle([x1,y1,x2,y1+6], fill=top)
+              if top_color:
+                  d.rectangle([x1,y1,x2,y1+8], fill=top_color)
 
           hook = quiz.get('hookTitle','오늘의 퀴즈')
           q    = quiz.get('question','')
@@ -208,95 +162,118 @@ jobs:
           dc   = {'easy':GREEN,'normal':GOLD,'hard':RED}.get(diff,GOLD)
           dl   = {'easy':'EASY','normal':'NORMAL','hard':'HARD'}.get(diff,'NORMAL')
 
-          # F1: Hook 3초
+          # ── F1: Hook (3초) ──
           img,d = base(ACCENT)
-          card(d,80,620,W-80,1100,top=ACCENT)
-          f34=fnt(34); bb=d.textbbox((0,0),dl,font=f34); bw=bb[2]-bb[0]+40
-          d.rounded_rectangle([(W-bw)//2,650,(W+bw)//2,694],radius=8,fill=dc)
-          d.text(((W-(bb[2]-bb[0]))//2,654),dl,font=f34,fill=BG)
-          center(d,hook,750,fnt(70),WHITE)
-          center(d,'맞출 수 있을까요?',965,fnt(44),GRAY)
-          center(d,'[ 계속 보기 ]',1830,fnt(30),DIM)
-          img.save('frames/f1.png'); print("f1 done")
+          # 중앙 카드 (화면 중간에 위치)
+          card(d, 80, 700, W-80, 1150, top_color=ACCENT)
+          # 난이도 뱃지
+          f34 = fnt(34)
+          bb = d.textbbox((0,0),dl,font=f34)
+          bw = bb[2]-bb[0]+40
+          d.rounded_rectangle([(W-bw)//2,728,(W+bw)//2,772], radius=8, fill=dc)
+          d.text(((W-(bb[2]-bb[0]))//2, 732), dl, font=f34, fill=BG)
+          # 제목
+          center(d, hook, 820, fnt(72), WHITE, max_w=880)
+          # 서브
+          center(d, '맞출 수 있을까요?', 1020, fnt(46), GRAY)
+          # 하단 안내
+          center(d, '[ 계속 보기 ]', 1840, fnt(32), DIM)
+          img.save('frames/f1.png')
+          print(f"f1: {W}x{H}")
 
-          # F2: Question 15초
+          # ── F2: Question (15초) ──
           img,d = base(ACCENT)
-          center(d,'QUESTION',130,fnt(40),ACCENT)
-          d.rectangle([120,196,W-120,200],fill=DIM)
-          card(d,60,230,W-60,int(H*0.60),top=ACCENT)
-          y = center(d,q,290,fnt(60),WHITE,max_w=880,spacing=16)
+          center(d, 'QUESTION', 160, fnt(42), ACCENT)
+          d.rectangle([100,220,W-100,224], fill=DIM)
+          card(d, 60, 260, W-60, int(H*0.62), top_color=ACCENT)
+          y = center(d, q, 320, fnt(62), WHITE, max_w=900, spacing=18)
           if opts:
-              y = max(y,680)
+              y = max(y, 720)
               for opt in opts[:4]:
-                  card(d,100,y,W-100,y+70,r=12,fill=DIM)
-                  d.text((130,y+12),opt,font=fnt(44),fill=WHITE); y+=86
-          center(d,'생각해보세요...',int(H*0.62),fnt(40),GRAY)
-          center(d,'구독하면 매일 퀴즈',1828,fnt(28),DIM)
-          img.save('frames/f2.png'); print("f2 done")
+                  card(d, 100, y, W-100, y+72, r=12, fill=DIM)
+                  d.text((135, y+14), opt, font=fnt(46), fill=WHITE)
+                  y += 88
+          center(d, '생각해보세요...', int(H*0.64), fnt(42), GRAY)
+          center(d, '구독하면 매일 퀴즈', 1840, fnt(30), DIM)
+          img.save('frames/f2.png')
+          print(f"f2: {W}x{H}")
 
-          # F3: 카운트다운 숫자별 (5,4,3,2,1)
+          # ── F3: 카운트다운 숫자 (각 1초) ──
           for num in [5,4,3,2,1]:
               img,d = base(GOLD)
-              card(d,80,660,W-80,1120,top=GOLD)
-              center(d,'정답은...?',700,fnt(44),GRAY)
-              f_num=fnt(260)
-              bb=d.textbbox((0,0),str(num),font=f_num)
-              d.text(((W-(bb[2]-bb[0]))//2,760),str(num),font=f_num,fill=GOLD)
+              card(d, 80, 700, W-80, 1180, top_color=GOLD)
+              center(d, '정답은...?', 740, fnt(46), GRAY)
+              f_big = fnt(280)
+              bb = d.textbbox((0,0), str(num), font=f_big)
+              d.text(((W-(bb[2]-bb[0]))//2, 800), str(num), font=f_big, fill=GOLD)
               img.save(f'frames/f3_{num}.png')
           print("f3 countdown done")
 
-          # F4: Answer 10초
+          # ── F4: Answer (10초) ──
           img,d = base(GREEN)
-          center(d,'ANSWER',130,fnt(40),GREEN)
-          d.rectangle([120,196,W-120,200],fill=DIM)
-          card(d,60,230,W-60,510,top=GREEN)
-          center(d,'정  답',262,fnt(36),GREEN)
-          center(d,ans,328,fnt(84),WHITE,max_w=900)
-          card(d,60,550,W-60,1090,top=DIM)
-          center(d,'해  설',590,fnt(36),GRAY)
-          d.rectangle([120,638,W-120,642],fill=DIM)
-          center(d,exp,665,fnt(46),WHITE,max_w=880,spacing=14)
-          img.save('frames/f4.png'); print("f4 done")
+          center(d, 'ANSWER', 160, fnt(42), GREEN)
+          d.rectangle([100,220,W-100,224], fill=DIM)
+          # 정답 카드
+          card(d, 60, 260, W-60, 540, top_color=GREEN)
+          center(d, '정  답', 290, fnt(38), GREEN)
+          center(d, ans, 365, fnt(86), WHITE, max_w=920)
+          # 해설 카드
+          card(d, 60, 580, W-60, 1120, top_color=DIM)
+          center(d, '해  설', 618, fnt(38), GRAY)
+          d.rectangle([100,668,W-100,672], fill=DIM)
+          center(d, exp, 696, fnt(48), WHITE, max_w=900, spacing=16)
+          img.save('frames/f4.png')
+          print(f"f4: {W}x{H}")
 
-          # F5: CTA 4초
+          # ── F5: CTA (4초) ──
           img,d = base(ACCENT)
-          card(d,60,600,W-60,1160,top=ACCENT)
-          center(d,'재미있었나요?',660,fnt(66),WHITE)
-          center(d,'매일 새 퀴즈 업로드!',805,fnt(50),GOLD)
-          d.rounded_rectangle([140,910,W-140,1010],radius=20,fill=ACCENT)
-          center(d,'좋아요 + 구독',932,fnt(52),WHITE)
-          center(d,'댓글로 정답 맞춰보세요',1055,fnt(38),GRAY)
-          img.save('frames/f5.png'); print("f5 done")
+          card(d, 60, 660, W-60, 1200, top_color=ACCENT)
+          center(d, '재미있었나요?', 720, fnt(68), WHITE)
+          center(d, '매일 새 퀴즈 업로드!', 870, fnt(52), GOLD)
+          d.rounded_rectangle([160, 980, W-160, 1080], radius=22, fill=ACCENT)
+          center(d, '좋아요 + 구독', 1002, fnt(54), WHITE)
+          center(d, '댓글로 정답 맞춰보세요', 1120, fnt(40), GRAY)
+          img.save('frames/f5.png')
+          print(f"f5: {W}x{H}")
           print("All frames done!")
           EOF
 
       - name: Compose video
         run: |
           set -e
-          echo "=== Audio ==="
-          ls -lh narration.mp3 bgm.mp3
-          has_tts=false; [ -s narration.mp3 ] && has_tts=true
-          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true
-          echo "has_tts=$has_tts has_bgm=$has_bgm"
+          echo "=== Audio check ==="
+          ls -lh narration.mp3 bgm.mp3 2>/dev/null || true
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: OK"
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: OK"
 
-          echo "=== Building scenes ==="
+          echo "=== Verifying frames ==="
+          for f in frames/f1.png frames/f2.png frames/f3_5.png frames/f4.png frames/f5.png; do
+            python3 -c "
+          from PIL import Image
+          img = Image.open('$f')
+          print(f'$f: {img.size}')
+            "
+          done
+
+          echo "=== Building video scenes ==="
+          VF_BASE="scale=1080:1920:force_original_aspect_ratio=disable,setsar=1,fps=30"
+
           # Scene1: Hook 3초
           ffmpeg -loop 1 -i frames/f1.png -t 3 \
-            -vf "scale=1080:1920:flags=lanczos,fps=30" \
+            -vf "${VF_BASE}" \
             -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
             s1.mp4 -y -loglevel warning
 
-          # Scene2: Question 15초 + 하단 프로그레스바
+          # Scene2: Question 15초 + 프로그레스바
           ffmpeg -loop 1 -i frames/f2.png -t 15 \
-            -vf "scale=1080:1920:flags=lanczos,fps=30,
-                 drawbox=x=0:y=1876:w='iw*t/15':h=16:color=5b7fff@1.0:t=fill" \
+            -vf "${VF_BASE},drawbox=x=0:y=1900:w='iw*t/15':h=20:color=5b7fff@1.0:t=fill" \
             -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
             s2.mp4 -y -loglevel warning
 
-          # Scene3: 카운트다운 각 1초 페이드인
+          # Scene3: 카운트다운 5→1 각 1초 페이드인
           for num in 5 4 3 2 1; do
             ffmpeg -loop 1 -i frames/f3_${num}.png -t 1 \
-              -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.2" \
+              -vf "${VF_BASE},fade=t=in:st=0:d=0.15" \
               -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
               cd${num}.mp4 -y -loglevel warning
           done
@@ -305,28 +282,29 @@ jobs:
 
           # Scene4: Answer 10초 페이드인
           ffmpeg -loop 1 -i frames/f4.png -t 10 \
-            -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.4" \
+            -vf "${VF_BASE},fade=t=in:st=0:d=0.4" \
             -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
             s4.mp4 -y -loglevel warning
 
           # Scene5: CTA 4초 페이드인
           ffmpeg -loop 1 -i frames/f5.png -t 4 \
-            -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.3" \
+            -vf "${VF_BASE},fade=t=in:st=0:d=0.3" \
             -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
             s5.mp4 -y -loglevel warning
 
+          # 합치기
           printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
           ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel warning
           DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
           echo "Total duration: ${DUR}s"
 
-          echo "=== Mixing audio ==="
+          echo "=== Audio mixing ==="
           if $has_tts && $has_bgm; then
             echo "Mixing TTS + BGM"
             ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
               -filter_complex \
                 "[1:a]apad,atrim=duration=${DUR}[tts];
-                 [2:a]apad,atrim=duration=${DUR},volume=0.12[bgm];
+                 [2:a]apad,atrim=duration=${DUR},volume=0.15[bgm];
                  [tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[a]" \
               -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
               quiz_video.mp4 -y -loglevel warning
@@ -339,15 +317,14 @@ jobs:
           elif $has_bgm; then
             echo "BGM only"
             ffmpeg -stream_loop -1 -i bgm.mp3 -i merged.mp4 \
-              -filter_complex "[0:a]atrim=duration=${DUR},volume=0.25[a]" \
+              -filter_complex "[0:a]atrim=duration=${DUR},volume=0.3[a]" \
               -map 1:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
               quiz_video.mp4 -y -loglevel warning
           else
-            echo "No audio"
             cp merged.mp4 quiz_video.mp4
           fi
 
-          echo "=== Final ==="
+          echo "=== Final output ==="
           ls -lh quiz_video.mp4
           ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
