@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Studio Mean</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- 사이드바 -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-mark">S</span>
+          <span class="logo-text">STUDIO<br><em>MEAN</em></span>
+        </div>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-tab="coupang">
+          <span class="nav-icon">🛒</span>
+          <span class="nav-label">쿠팡 숏츠</span>
+        </li>
+        <li class="nav-item" data-tab="storytelling">
+          <span class="nav-icon">🌌</span>
+          <span class="nav-label">스토리텔링</span>
+        </li>
+        <li class="nav-item" data-tab="quiz">
+          <span class="nav-icon">🧠</span>
+          <span class="nav-label">퀴즈 숏츠</span>
+        </li>
+        <li class="nav-item" data-tab="psych">
+          <span class="nav-icon">🏥</span>
+          <span class="nav-label">정신과 블로그</span>
+        </li>
+        <li class="nav-item" data-tab="tistory">
+          <span class="nav-icon">✍️</span>
+          <span class="nav-label">티스토리</span>
+        </li>
+        <li class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">설정</span>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="api-status" id="apiStatus">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">API 미설정</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+
+      <!-- ===================== 쿠팡 숏츠 탭 ===================== -->
+      <section class="tab-panel active" id="tab-coupang">
+        <div class="panel-header">
+          <h1>쿠팡 파트너스 숏츠</h1>
+          <p>상품을 자동 조회하고 숏츠 스크립트 + 나레이션을 생성합니다</p>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <!-- 왼쪽: 상품 조회 -->
+            <div class="col">
+              <div class="card">
+                <div class="card-title">상품 조회</div>
+                <div class="form-group">
+                  <label>카테고리</label>
+                  <select id="coupangCategory">
+                    <option value="home">주방/생활</option>
+                    <option value="beauty">뷰티/건강</option>
+                    <option value="fashion">패션</option>
+                    <option value="digital">디지털/가전</option>
+                    <option value="baby">유아/아동</option>
+                    <option value="pet">반려동물</option>
+                    <option value="sports">스포츠/레저</option>
+                    <option value="food">식품</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>스크립트 유형</label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="scriptType" value="PAIN" checked /> PAIN형
+                      <span class="radio-desc">문제 공감 → 해결책 제시</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="scriptType" value="WOW" /> WOW형
+                      <span class="radio-desc">놀라움 → 구매 유도</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>상품 URL 직접 입력 <span class="optional">(선택)</span></label>
+                  <input type="text" id="coupangUrl" placeholder="https://www.coupang.com/vp/products/..." />
+                </div>
+                <button class="btn btn-primary" id="fetchCoupangBtn" onclick="fetchCoupangProduct()">
+                  <span>상품 조회</span>
+                </button>
+              </div>
+
+              <!-- 조회된 상품 정보 -->
+              <div class="card" id="productCard" style="display:none">
+                <div class="card-title">조회된 상품</div>
+                <div class="product-info" id="productInfo"></div>
+                <button class="btn btn-primary" id="generateScriptBtn" onclick="generateCoupangScript()">
+                  <span>스크립트 생성</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 오른쪽: 스크립트 결과 -->
+            <div class="col">
+              <div class="card result-card" id="coupangResult" style="display:none">
+                <div class="card-title">
+                  생성된 스크립트
+                  <div class="card-actions">
+                    <button class="btn-sm" onclick="copyResult('coupangScriptOutput')">복사</button>
+                    <button class="btn-sm btn-accent" onclick="generateTTS('coupangNarration')">🔊 TTS 생성</button>
+                  </div>
+                </div>
+                <div class="script-output" id="coupangScriptOutput"></div>
+                <div class="narration-box" id="coupangNarrationBox" style="display:none">
+                  <div class="card-title">나레이션 텍스트</div>
+                  <div class="narration-text" id="coupangNarration"></div>
+                  <audio id="coupangAudio" controls style="width:100%;margin-top:8px;display:none"></audio>
+                </div>
+                <div class="affiliate-link" id="coupangLinkBox" style="display:none">
+                  <div class="card-title">파트너스 링크</div>
+                  <div class="link-text" id="coupangAffiliateLink"></div>
+                  <button class="btn-sm" onclick="copyText('coupangAffiliateLink')">링크 복사</button>
+                </div>
+              </div>
+              <div class="loading-card" id="coupangLoading" style="display:none">
+                <div class="spinner"></div>
+                <p id="coupangLoadingText">처리 중...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 스토리텔링 탭 ===================== -->
+      <section class="tab-panel" id="tab-storytelling">
+        <div class="panel-header">
+          <h1>스토리텔링 숏츠</h1>
+          <p>음모론·우주·미스터리 주제를 추천하고 한/영 스크립트를 생성합니다</p>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <div class="col">
+              <div class="card">
+                <div class="card-title">주제 추천</div>
+                <div class="form-group">
+                  <label>카테고리</label>
+                  <div class="checkbox-group">
+                    <label class="check-label"><input type="checkbox" value="conspiracy" checked /> 음모론</label>
+                    <label class="check-label"><input type="checkbox" value="universe" checked /> 우주</label>
+                    <label class="check-label"><input type="checkbox" value="mystery" checked /> 미스터리</label>
+                    <label class="check-label"><input type="checkbox" value="history" /> 역사 미스터리</label>
+                    <label class="check-label"><input type="checkbox" value="paranormal" /> 초자연현상</label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>주제 범위</label>
+                  <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="topicRange" value="all" checked /> 꾸준히 거론 + 덜 알려진 주제 혼합</label>
+                    <label class="radio-label"><input type="radio" name="topicRange" value="famous" /> 유명한 주제만</label>
+                    <label class="radio-label"><input type="radio" name="topicRange" value="hidden" /> 덜 알려진 주제만</label>
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="recommendTopics()">
+                  <span>주제 추천 (5개)</span>
+                </button>
+              </div>
+
+              <div class="card" id="topicListCard" style="display:none">
+                <div class="card-title">추천 주제 — 선택하세요</div>
+                <div class="topic-list" id="topicList"></div>
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="card result-card" id="storytellingResult" style="display:none">
+                <div class="card-title">
+                  스크립트 (한국어)
+                  <button class="btn-sm" onclick="copyResult('storyScriptKo')">복사</button>
+                </div>
+                <div class="script-output" id="storyScriptKo"></div>
+                <div class="card-title" style="margin-top:16px">
+                  Script (English)
+                  <button class="btn-sm" onclick="copyResult('storyScriptEn')">복사</button>
+                </div>
+                <div class="script-output" id="storyScriptEn"></div>
+              </div>
+              <div class="loading-card" id="storytellingLoading" style="display:none">
+                <div class="spinner"></div>
+                <p id="storytellingLoadingText">주제를 분석 중입니다...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 퀴즈 숏츠 탭 ===================== -->
+      <section class="tab-panel" id="tab-quiz">
+        <div class="panel-header">
+          <h1>퀴즈 숏츠 자동화</h1>
+          <p>퀴즈 문제를 생성하고 GitHub Actions로 완성된 영상을 자동 렌더링합니다</p>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <div class="col">
+              <div class="card">
+                <div class="card-title">퀴즈 설정</div>
+                <div class="form-group">
+                  <label>카테고리</label>
+                  <select id="quizCategory">
+                    <option value="math">수학·논리 문제</option>
+                    <option value="iq">IQ 테스트형</option>
+                    <option value="psychology">심리테스트</option>
+                    <option value="common">상식 퀴즈</option>
+                    <option value="nonsense">넌센스·수수께끼</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>난이도</label>
+                  <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="easy" /> 쉬움</label>
+                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="normal" checked /> 보통</label>
+                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="hard" /> 어려움</label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>언어</label>
+                  <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="quizLang" value="ko" checked /> 한국어</label>
+                    <label class="radio-label"><input type="radio" name="quizLang" value="en" /> English</label>
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="generateQuiz()">
+                  <span>퀴즈 생성</span>
+                </button>
+              </div>
+
+              <div class="card info-card">
+                <div class="card-title">🎬 영상 렌더링 안내</div>
+                <p class="info-text">퀴즈 생성 후 <strong>GitHub Actions 트리거</strong> 버튼을 누르면<br>
+                서버 없이 자동으로 mp4 영상이 생성됩니다.</p>
+                <div class="flow-steps">
+                  <div class="flow-step">① 퀴즈 생성</div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">② Actions 트리거</div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">③ mp4 다운로드</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="card result-card" id="quizResult" style="display:none">
+                <div class="card-title">
+                  생성된 퀴즈
+                  <button class="btn-sm" onclick="copyResult('quizOutput')">복사</button>
+                </div>
+                <div class="quiz-output" id="quizOutput"></div>
+                <div class="quiz-actions" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="triggerGithubActions()" id="actionsBtn">
+                    <span>🚀 GitHub Actions 트리거</span>
+                  </button>
+                  <button class="btn-sm btn-accent" onclick="generateTTS('quizNarrationText')">🔊 TTS 미리듣기</button>
+                </div>
+                <div id="actionsStatus" style="display:none;margin-top:12px" class="status-box"></div>
+                <div class="narration-box" id="quizNarrationBox" style="display:none">
+                  <div class="card-title">나레이션 텍스트</div>
+                  <div class="narration-text" id="quizNarrationText"></div>
+                  <audio id="quizAudio" controls style="width:100%;margin-top:8px;display:none"></audio>
+                </div>
+              </div>
+              <div class="loading-card" id="quizLoading" style="display:none">
+                <div class="spinner"></div>
+                <p>퀴즈를 생성 중입니다...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 정신과 블로그 탭 ===================== -->
+      <section class="tab-panel" id="tab-psych">
+        <div class="panel-header">
+          <h1>정신과 블로그</h1>
+          <p>인천 가로수 정신건강의학과 — 네이버 블로그 포스팅을 생성합니다</p>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <div class="col">
+              <div class="card">
+                <div class="card-title">주제 추천</div>
+                <div class="form-group">
+                  <label>작성 제외 주제 <span class="optional">(이미 작성한 주제 입력, 줄바꿈으로 구분)</span></label>
+                  <textarea id="psychExclude" rows="4" placeholder="월경전불쾌장애&#10;정신과 진료 기록&#10;기분부전장애"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="recommendPsychTopics()">
+                  <span>주제 추천 (5개)</span>
+                </button>
+              </div>
+
+              <div class="card" id="psychTopicCard" style="display:none">
+                <div class="card-title">추천 주제 — 선택하세요</div>
+                <div class="topic-list" id="psychTopicList"></div>
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="card result-card" id="psychResult" style="display:none">
+                <div class="card-title">
+                  생성된 블로그 글
+                  <div class="card-actions">
+                    <button class="btn-sm" onclick="copyResult('psychOutput')">전체 복사</button>
+                  </div>
+                </div>
+                <div class="blog-title-box" id="psychTitleBox"></div>
+                <div class="script-output blog-output" id="psychOutput"></div>
+                <div class="image-links" id="psychImages" style="display:none">
+                  <div class="card-title" style="margin-top:16px">추천 이미지 링크 (Pexels)</div>
+                  <div id="psychImageList"></div>
+                </div>
+              </div>
+              <div class="loading-card" id="psychLoading" style="display:none">
+                <div class="spinner"></div>
+                <p id="psychLoadingText">블로그 글을 작성 중입니다...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 티스토리 탭 ===================== -->
+      <section class="tab-panel" id="tab-tistory">
+        <div class="panel-header">
+          <h1>티스토리 블로그</h1>
+          <p>개인 블로그 포스팅 주제를 추천하고 글을 생성합니다</p>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <div class="col">
+              <div class="card">
+                <div class="card-title">주제 추천</div>
+                <div class="form-group">
+                  <label>관심 카테고리</label>
+                  <div class="checkbox-group">
+                    <label class="check-label"><input type="checkbox" value="social" checked /> 사회 이슈</label>
+                    <label class="check-label"><input type="checkbox" value="news" checked /> 화제 뉴스</label>
+                    <label class="check-label"><input type="checkbox" value="tip" checked /> 생활 팁</label>
+                    <label class="check-label"><input type="checkbox" value="common" /> 상식</label>
+                    <label class="check-label"><input type="checkbox" value="review" /> 리뷰·경험담</label>
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="recommendTistoryTopics()">
+                  <span>주제 추천 (5개)</span>
+                </button>
+              </div>
+
+              <div class="card" id="tistoryTopicCard" style="display:none">
+                <div class="card-title">추천 주제 — 선택하세요</div>
+                <div class="topic-list" id="tistoryTopicList"></div>
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="card result-card" id="tistoryResult" style="display:none">
+                <div class="card-title">
+                  생성된 블로그 글
+                  <button class="btn-sm" onclick="copyResult('tistoryOutput')">전체 복사</button>
+                </div>
+                <div class="blog-title-box" id="tistoryTitleBox"></div>
+                <div class="script-output blog-output" id="tistoryOutput"></div>
+              </div>
+              <div class="loading-card" id="tistoryLoading" style="display:none">
+                <div class="spinner"></div>
+                <p id="tistoryLoadingText">블로그 글을 작성 중입니다...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 설정 탭 ===================== -->
+      <section class="tab-panel" id="tab-settings">
+        <div class="panel-header">
+          <h1>설정</h1>
+          <p>API 키를 저장합니다. 모든 키는 브라우저 로컬에만 저장됩니다.</p>
+        </div>
+        <div class="panel-body">
+          <div class="settings-grid">
+            <div class="card settings-card">
+              <div class="card-title">🤖 Claude API</div>
+              <div class="form-group">
+                <label>Anthropic API Key</label>
+                <div class="input-row">
+                  <input type="password" id="claudeKey" placeholder="sk-ant-..." />
+                  <button class="btn-sm" onclick="saveKey('claudeKey', 'CLAUDE_API_KEY')">저장</button>
+                </div>
+              </div>
+            </div>
+            <div class="card settings-card">
+              <div class="card-title">✨ Gemini API</div>
+              <div class="form-group">
+                <label>Google Gemini API Key</label>
+                <div class="input-row">
+                  <input type="password" id="geminiKey" placeholder="AIza..." />
+                  <button class="btn-sm" onclick="saveKey('geminiKey', 'GEMINI_API_KEY')">저장</button>
+                </div>
+              </div>
+            </div>
+            <div class="card settings-card">
+              <div class="card-title">🔊 Google Cloud TTS</div>
+              <div class="form-group">
+                <label>Google Cloud API Key</label>
+                <div class="input-row">
+                  <input type="password" id="ttsKey" placeholder="AIza..." />
+                  <button class="btn-sm" onclick="saveKey('ttsKey', 'GCP_TTS_KEY')">저장</button>
+                </div>
+              </div>
+            </div>
+            <div class="card settings-card">
+              <div class="card-title">🛒 쿠팡 파트너스</div>
+              <div class="form-group">
+                <label>Access Key</label>
+                <div class="input-row">
+                  <input type="password" id="coupangAccessKey" placeholder="Access Key" />
+                  <button class="btn-sm" onclick="saveKey('coupangAccessKey', 'COUPANG_ACCESS_KEY')">저장</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Secret Key</label>
+                <div class="input-row">
+                  <input type="password" id="coupangSecretKey" placeholder="Secret Key" />
+                  <button class="btn-sm" onclick="saveKey('coupangSecretKey', 'COUPANG_SECRET_KEY')">저장</button>
+                </div>
+              </div>
+            </div>
+            <div class="card settings-card">
+              <div class="card-title">🖼️ Pexels API</div>
+              <div class="form-group">
+                <label>Pexels API Key</label>
+                <div class="input-row">
+                  <input type="password" id="pexelsKey" placeholder="Pexels API Key" />
+                  <button class="btn-sm" onclick="saveKey('pexelsKey', 'PEXELS_API_KEY')">저장</button>
+                </div>
+              </div>
+            </div>
+            <div class="card settings-card">
+              <div class="card-title">🐙 GitHub</div>
+              <div class="form-group">
+                <label>GitHub Token (classic)</label>
+                <div class="input-row">
+                  <input type="password" id="githubToken" placeholder="ghp_..." />
+                  <button class="btn-sm" onclick="saveKey('githubToken', 'GITHUB_TOKEN')">저장</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>레포지토리</label>
+                <input type="text" id="githubRepo" placeholder="meanismmm/studio_mean" />
+                <button class="btn-sm" style="margin-top:6px" onclick="saveKey('githubRepo', 'GITHUB_REPO')">저장</button>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <div class="card-title">저장 상태</div>
+            <div class="key-status-grid" id="keyStatusGrid"></div>
+            <button class="btn-danger" onclick="clearAllKeys()" style="margin-top:16px">모든 키 초기화</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/coupang.js"></script>
+  <script src="js/storytelling.js"></script>
+  <script src="js/quiz.js"></script>
+  <script src="js/blog.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
