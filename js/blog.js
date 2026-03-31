@@ -1,15 +1,4 @@
-// ===== blog.js — 정신과 블로그 + 티스토리 =====
-
-function safeJSON(text) {
-  let clean = text.replace(/```json|```/g, '').trim();
-  const first = Math.min(
-    clean.indexOf('{') === -1 ? Infinity : clean.indexOf('{'),
-    clean.indexOf('[') === -1 ? Infinity : clean.indexOf('[')
-  );
-  const last = Math.max(clean.lastIndexOf('}'), clean.lastIndexOf(']'));
-  if (first !== Infinity && last !== -1) clean = clean.slice(first, last + 1);
-  return JSON.parse(clean);
-}
+// ===== blog.js =====
 
 async function recommendPsychTopics() {
   const excludeEl = document.getElementById('psychExclude');
@@ -19,15 +8,22 @@ async function recommendPsychTopics() {
   document.getElementById('psychResult').style.display = 'none';
   try {
     const result = await callClaude(
-      '당신은 정신건강의학과 블로그 주제 기획 전문가입니다. 반드시 순수 JSON만 반환하세요. 마크다운 없이.',
-      `인천 가로수 정신건강의학과 네이버 블로그 포스팅 주제 5개 추천.
-제외: ${exclude.length ? exclude.join(', ') : '없음'}
+      '당신은 정신건강의학과 블로그 주제 기획 전문가입니다.',
+      `인천 가로수 정신건강의학과 네이버 블로그 포스팅 주제 5개를 추천해주세요.
+제외 주제: ${exclude.length ? exclude.join(', ') : '없음'}
 의원급 진료 가능 질환, 네이버 검색량 있는 주제, 카테고리 다양하게.
-JSON만: {"topics":[{"title":"제목","disease":"질환","angle":"각도","summary":"요약","searchKeyword":"키워드"}]}`,
-      1000
+
+반드시 아래 형식으로만 답하세요. 번호와 제목만:
+1. 제목1
+2. 제목2
+3. 제목3
+4. 제목4
+5. 제목5`,
+      500
     );
-    const data = safeJSON(result);
-    renderPsychTopics(data.topics);
+    const lines = result.trim().split('\n').filter(l => l.match(/^\d+\./));
+    const topics = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+    renderPsychTopics(topics);
   } catch(e) { showToast('오류: ' + e.message); }
   finally { setLoading('psychLoading', false); }
 }
@@ -35,50 +31,48 @@ JSON만: {"topics":[{"title":"제목","disease":"질환","angle":"각도","summa
 function renderPsychTopics(topics) {
   const list = document.getElementById('psychTopicList');
   list.innerHTML = '';
-  topics.forEach((t, i) => {
+  topics.forEach((title, i) => {
     const item = document.createElement('div');
     item.className = 'topic-item';
-    item.innerHTML = `<div class="topic-num">${String(i+1).padStart(2,'0')}</div><div><div class="topic-title">${t.title}</div><div class="topic-desc">${t.disease} · ${t.angle}</div><div class="topic-desc">${t.summary}</div></div>`;
-    item.addEventListener('click', () => generatePsychPost(t));
+    item.innerHTML = `<div class="topic-num">${String(i+1).padStart(2,'0')}</div><div><div class="topic-title">${title}</div></div>`;
+    item.addEventListener('click', () => generatePsychPost(title));
     list.appendChild(item);
   });
   document.getElementById('psychTopicCard').style.display = 'block';
 }
 
-async function generatePsychPost(topic) {
+async function generatePsychPost(title) {
   setLoading('psychLoading', true, '블로그 글을 작성 중입니다...');
   document.getElementById('psychResult').style.display = 'none';
   try {
     const result = await callClaude(
-      '당신은 인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 작가입니다. 따뜻하고 공감적인 의사 어투. 반드시 순수 JSON만 반환. 마크다운 없이.',
-      `주제: ${topic.title} / 질환: ${topic.disease} / 각도: ${topic.angle} / 키워드: ${topic.searchKeyword}
-JSON형식: {"title":"제목","intro":"감성적도입150자이상","sections":[{"heading":"【소제목】","content":"본문200자이상"},{"heading":"【소제목】","content":"본문200자이상"},{"heading":"【소제목】","content":"본문200자이상"}],"closing":"마무리100자이상","pexelsQuery":"english keyword"}`,
-      3000
+      `당신은 인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 작가입니다.
+따뜻하고 공감적인 의사 어투로 작성합니다.
+(사진) 표시를 각 단락 사이에 넣어주세요.
+마지막에 반드시 "인천 가로수 정신건강의학과 이성철 원장" 을 넣어주세요.`,
+      `다음 주제로 네이버 블로그 글을 작성해주세요: ${title}
+800자 이상, SEO 최적화, 소제목 포함, (사진) 위치 표시 포함.
+제목도 맨 위에 써주세요.`,
+      2000
     );
-    const post = safeJSON(result);
-    await renderPsychPost(post);
+    document.getElementById('psychTitleBox').textContent = title;
+    document.getElementById('psychOutput').textContent = result;
+    document.getElementById('psychImages').style.display = 'block';
+    const imgList = document.getElementById('psychImageList');
+    imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">이미지 검색 중...</div>';
+    try {
+      const images = await searchPexels('mental health therapy', 5);
+      if (images.length) {
+        imgList.innerHTML = images.map((img, i) =>
+          `<div class="image-link-item"><span style="color:#4a4a5a;font-size:11px;min-width:20px">${i+1}</span><a href="${img.src}" target="_blank">${img.src}</a><button class="btn-sm" onclick="navigator.clipboard.writeText('${img.src}').then(()=>showToast('복사됨!'))">복사</button></div>`
+        ).join('');
+      } else {
+        imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">Pexels API 키 설정 시 이미지 링크 표시</div>';
+      }
+    } catch(e) { imgList.innerHTML = ''; }
+    document.getElementById('psychResult').style.display = 'block';
   } catch(e) { showToast('오류: ' + e.message); }
   finally { setLoading('psychLoading', false); }
-}
-
-async function renderPsychPost(post) {
-  document.getElementById('psychTitleBox').textContent = post.title || '';
-  let content = (post.intro || '') + '\n\n(사진)\n\n';
-  (post.sections || []).forEach(s => { content += `${s.heading}\n\n${s.content}\n\n(사진)\n\n`; });
-  content += (post.closing || '') + '\n\n---\n\n인천 가로수 정신건강의학과 이성철 원장';
-  document.getElementById('psychOutput').textContent = content;
-  const imgList = document.getElementById('psychImageList');
-  imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">이미지 검색 중...</div>';
-  document.getElementById('psychImages').style.display = 'block';
-  try {
-    const images = await searchPexels(post.pexelsQuery || 'mental health therapy', 5);
-    if (images.length) {
-      imgList.innerHTML = images.map((img, i) => `<div class="image-link-item"><span style="color:#4a4a5a;font-size:11px;min-width:20px">${i+1}</span><a href="${img.src}" target="_blank">${img.src}</a><button class="btn-sm" onclick="navigator.clipboard.writeText('${img.src}').then(()=>showToast('복사됨!'))">복사</button></div>`).join('');
-    } else {
-      imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">Pexels API 키 설정 시 이미지 링크 표시</div>';
-    }
-  } catch(e) { imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">이미지 검색 실패</div>'; }
-  document.getElementById('psychResult').style.display = 'block';
 }
 
 async function recommendTistoryTopics() {
@@ -92,13 +86,19 @@ async function recommendTistoryTopics() {
   const catNames = categories.map(c => catMap[c] || c).join(', ');
   try {
     const result = await callClaude(
-      '당신은 티스토리 개인 블로그 주제 기획자입니다. 반드시 순수 JSON만 반환. 마크다운 없이.',
-      `카테고리: ${catNames}. 공감되고 유머있는 주제 5개.
-JSON만: {"topics":[{"title":"제목","category":"카테고리","angle":"접근방식","hook":"첫문장"}]}`,
-      800
+      '당신은 티스토리 개인 블로그 주제 기획자입니다.',
+      `카테고리: ${catNames}
+공감되고 유머있는 개인 블로그 주제 5개를 번호 목록으로만 답해주세요.
+1. 제목1
+2. 제목2
+3. 제목3
+4. 제목4
+5. 제목5`,
+      400
     );
-    const data = safeJSON(result);
-    renderTistoryTopics(data.topics);
+    const lines = result.trim().split('\n').filter(l => l.match(/^\d+\./));
+    const topics = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+    renderTistoryTopics(topics);
   } catch(e) { showToast('오류: ' + e.message); }
   finally { setLoading('tistoryLoading', false); }
 }
@@ -106,37 +106,31 @@ JSON만: {"topics":[{"title":"제목","category":"카테고리","angle":"접근�
 function renderTistoryTopics(topics) {
   const list = document.getElementById('tistoryTopicList');
   list.innerHTML = '';
-  topics.forEach((t, i) => {
+  topics.forEach((title, i) => {
     const item = document.createElement('div');
     item.className = 'topic-item';
-    item.innerHTML = `<div class="topic-num">${String(i+1).padStart(2,'0')}</div><div><div class="topic-title">${t.title}</div><div class="topic-desc">${t.category} · ${t.angle}</div><div class="topic-desc" style="font-style:italic">"${t.hook}"</div></div>`;
-    item.addEventListener('click', () => generateTistoryPost(t));
+    item.innerHTML = `<div class="topic-num">${String(i+1).padStart(2,'0')}</div><div><div class="topic-title">${title}</div></div>`;
+    item.addEventListener('click', () => generateTistoryPost(title));
     list.appendChild(item);
   });
   document.getElementById('tistoryTopicCard').style.display = 'block';
 }
 
-async function generateTistoryPost(topic) {
+async function generateTistoryPost(title) {
   setLoading('tistoryLoading', true, '블로그 글을 작성 중입니다...');
   document.getElementById('tistoryResult').style.display = 'none';
   try {
     const result = await callClaude(
-      '당신은 티스토리 개인 블로그 작가입니다. 1인칭 솔직하고 유머있는 구어체. 반드시 순수 JSON만 반환. 마크다운 없이.',
-      `주제: ${topic.title} / 각도: ${topic.angle} / 첫문장힌트: ${topic.hook}
-JSON형식: {"title":"최종제목","intro":"도입150자이상","sections":[{"heading":"소제목","content":"본문200자이상"},{"heading":"소제목","content":"본문200자이상"},{"heading":"소제목","content":"본문200자이상"}],"closing":"마무리"}`,
-      3000
+      `당신은 티스토리 개인 블로그 작가입니다.
+1인칭, 솔직하고 유머있는 구어체로 씁니다.
+소제목은 ## 형식으로, 사진 위치는 (사진) 으로 표시해주세요.`,
+      `다음 주제로 티스토리 블로그 글을 작성해주세요: ${title}
+800자 이상, 소제목 포함, (사진) 위치 표시, 마지막은 "끝이다." 류로 마무리.`,
+      2000
     );
-    const post = safeJSON(result);
-    renderTistoryPost(post);
+    document.getElementById('tistoryTitleBox').textContent = title;
+    document.getElementById('tistoryOutput').textContent = result;
+    document.getElementById('tistoryResult').style.display = 'block';
   } catch(e) { showToast('오류: ' + e.message); }
   finally { setLoading('tistoryLoading', false); }
-}
-
-function renderTistoryPost(post) {
-  document.getElementById('tistoryTitleBox').textContent = post.title || '';
-  let content = (post.intro || '') + '\n\n(사진)\n\n';
-  (post.sections || []).forEach(s => { content += `## ${s.heading}\n\n${s.content}\n\n(사진)\n\n`; });
-  content += '---\n\n' + (post.closing || '');
-  document.getElementById('tistoryOutput').textContent = content;
-  document.getElementById('tistoryResult').style.display = 'block';
 }
