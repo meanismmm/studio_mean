@@ -33,7 +33,6 @@ jobs:
               f.write(data)
           quiz = json.loads(data)
           print('Hook:', quiz.get('hookTitle',''))
-          print('Question:', quiz.get('question','')[:40])
           "
 
       - name: Generate TTS
@@ -64,7 +63,6 @@ jobs:
               print(f"TTS: {len(data)} bytes")
           else:
               open('narration.mp3','wb').close()
-              print(f"TTS failed: {resp.status_code}")
           EOF
 
       - name: Generate BGM
@@ -88,7 +86,7 @@ jobs:
             -t 30 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
           echo "BGM: $(du -h bgm.mp3)"
 
-      - name: Render base frames
+      - name: Render frames
         run: |
           python3 << 'EOF'
           import json, os
@@ -100,24 +98,20 @@ jobs:
           W, H = 1080, 1920
           os.makedirs('frames', exist_ok=True)
 
-          # 고정 컬러
-          DARK_BG  = (18, 18, 22)
-          WHITE_BG = (252, 252, 252)
-          DARK_FG  = (22, 22, 28)
-          BLACK    = (20, 20, 24)
-          ACCENT   = (40, 40, 48)
-          TEXT_DK  = (240, 240, 248)
-          TEXT_LT  = (30, 30, 36)
-          TEXT_GR  = (140, 140, 155)
-          DOT_OFF  = (210, 210, 218)
-          DOT_ON   = (30, 30, 38)
+          # 컬러
+          WHITE_BG  = (250, 250, 252)
+          TEXT_LT   = (24, 24, 30)
+          TEXT_GR   = (160, 160, 175)
+          TEXT_WHT  = (238, 238, 248)
+          DOT_OFF   = (200, 200, 212)
+          DOT_ON    = (30, 30, 42)
+          GREEN_ANS = (32, 178, 158)
 
-          # 레이아웃 고정값
-          HEADER_H  = 520    # 헤더 높이
-          BODY_Y    = 520    # 본문 시작
-          BODY_H    = 1100   # 본문 높이
-          FOOTER_Y  = 1620   # 푸터 시작
-          FOOTER_H  = 300    # 푸터 높이
+          # 레이아웃
+          HEADER_H = 480
+          BODY_Y   = HEADER_H
+          BODY_H   = 1180
+          FOOTER_Y = BODY_Y + BODY_H
 
           def fnt(size):
               for p in [
@@ -131,15 +125,17 @@ jobs:
               return ImageFont.load_default()
 
           def tw(d, t, f):
-              bb = d.textbbox((0,0),t,font=f)
-              return bb[2]-bb[0]
-
+              bb = d.textbbox((0,0),t,font=f); return bb[2]-bb[0]
           def th(d, t, f):
-              bb = d.textbbox((0,0),t,font=f)
-              return bb[3]-bb[1]
+              bb = d.textbbox((0,0),t,font=f); return bb[3]-bb[1]
 
-          def cx(d, text, y, font, color, max_w=960, lsp=12):
-              """중앙정렬 + 자동줄바꿈"""
+          def fit_font(d, text, max_w, sizes):
+              for s in sizes:
+                  f = fnt(s)
+                  if tw(d, text, f) <= max_w: return f
+              return fnt(sizes[-1])
+
+          def cx(d, text, y, font, color, max_w=960, lsp=16):
               words = text.split()
               lines, cur = [], ''
               for w in words:
@@ -148,10 +144,8 @@ jobs:
                       lines.append(cur); cur = w
                   else: cur = t2
               if cur: lines.append(cur)
-              # 단어 분할이 안되면 글자수 반반
-              if len(lines) == 1 and tw(d, lines[0], font) > max_w:
-                  t = lines[0]
-                  mid = len(t)//2
+              if len(lines)==1 and tw(d, lines[0], font) > max_w:
+                  t = lines[0]; mid = len(t)//2
                   lines = [t[:mid], t[mid:]]
               for line in lines:
                   ww = tw(d, line, font)
@@ -159,163 +153,200 @@ jobs:
                   y += th(d, line, font) + lsp
               return y
 
-          def fit_font(d, text, max_w, sizes):
-              """텍스트가 max_w 안에 들어오는 첫 폰트 반환"""
-              for s in sizes:
-                  f = fnt(s)
-                  if tw(d, text, f) <= max_w:
-                      return f
-              return fnt(sizes[-1])
-
-          hook = quiz.get('hookTitle', '오늘의 퀴즈')
-          q    = quiz.get('question', '')
-          ans  = quiz.get('answer', '')
-          exp  = quiz.get('explanation', '')
-          opts = quiz.get('options', [])
+          def make_dark_gradient():
+              """다크 헤더용 그라데이션 (딥네이비 → 다크슬레이트)"""
+              img = Image.new('RGB', (W, HEADER_H))
+              d = ImageDraw.Draw(img)
+              top    = (14, 16, 28)   # 딥 네이비
+              bottom = (26, 28, 42)   # 다크 슬레이트
+              for y in range(HEADER_H):
+                  t = y / HEADER_H
+                  r = int(top[0] + (bottom[0]-top[0]) * t)
+                  g = int(top[1] + (bottom[1]-top[1]) * t)
+                  b = int(top[2] + (bottom[2]-top[2]) * t)
+                  d.rectangle([0, y, W, y+1], fill=(r,g,b))
+              return img
 
           def make_frame(dot_filled=0, show_answer=False):
-              """
-              dot_filled: 0~10 (채워진 도트 수)
-              show_answer: True면 정답/해설 표시
-              """
-              img = Image.new('RGB', (W, H), DARK_BG)
+              img = Image.new('RGB', (W, H), WHITE_BG)
               d = ImageDraw.Draw(img)
 
-              # ── 헤더 (다크) ──
-              # 상단 태그라인
-              f_tag = fnt(40)
+              # ── 헤더: 그라데이션 배경 ──
+              header = make_dark_gradient()
+              img.paste(header, (0, 0))
+              d = ImageDraw.Draw(img)
+
+              # 상단 얇은 포인트 라인
+              ACCENT_LINE = (91, 127, 255)
+              d.rectangle([0, 0, W, 5], fill=ACCENT_LINE)
+
+              # 태그라인
+              f_tag = fnt(38)
               tag = '매일 30초 퀴즈!'
-              d.text(((W - tw(d,tag,f_tag))//2, 60), tag, font=f_tag, fill=TEXT_GR)
+              d.text(((W-tw(d,tag,f_tag))//2, 52), tag, font=f_tag, fill=(130,140,175))
 
               # 구분선
-              d.rectangle([60, 124, W-60, 127], fill=(45,45,55))
+              d.rectangle([80, 108, W-80, 111], fill=(50,54,80))
 
-              # 훅 타이틀 (문제 제목)
-              f_hook = fit_font(d, hook, 940, [80,70,60,52,44])
-              cy = 160
-              cy = cx(d, hook, cy, f_hook, TEXT_DK, max_w=940, lsp=16)
+              # 제목: 항상 '정답을 맞춰보세요' 고정
+              fixed_title = '정답을 맞춰보세요'
+              f_title = fnt(74)
+              title_w = tw(d, fixed_title, f_title)
+              # 헤더 세로 중앙 (108 ~ HEADER_H)
+              title_area_h = HEADER_H - 130
+              title_h = th(d, fixed_title, f_title)
+              title_y = 130 + (title_area_h - title_h) // 2
+              d.text(((W-title_w)//2, title_y), fixed_title, font=f_title, fill=TEXT_WHT)
 
-              # ── 본문 (흰 배경) ──
-              d.rectangle([0, BODY_Y, W, BODY_Y+BODY_H], fill=WHITE_BG)
+              # 헤더 하단 구분선 (흰 본문과 경계)
+              d.rectangle([0, HEADER_H-4, W, HEADER_H], fill=(40,44,68))
+
+              # ── 본문: 흰 배경 ──
+              body_bottom = BODY_Y + BODY_H
+              d.rectangle([0, BODY_Y, W, body_bottom], fill=WHITE_BG)
 
               if not show_answer:
-                  # 문제 텍스트
-                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=DARK_FG)
-                  f_q = fit_font(d, q, 920, [64,56,50,44,38])
-                  qy = BODY_Y + 60
-                  qy = cx(d, q, qy, f_q, TEXT_LT, max_w=920, lsp=18)
+                  # 문제 텍스트 세로 중앙 정렬
+                  q = quiz.get('question', '')
+                  opts = quiz.get('options', [])
+                  f_q = fit_font(d, q, 900, [68,60,54,48,42])
+
+                  # 줄 계산
+                  words = q.split()
+                  lines, cur = [], ''
+                  for w in words:
+                      t2 = (cur+' '+w).strip()
+                      if tw(d, t2, f_q) > 900 and cur:
+                          lines.append(cur); cur = w
+                      else: cur = t2
+                  if cur: lines.append(cur)
+
+                  line_h = th(d, lines[0], f_q) + 28
+                  q_total_h = len(lines) * line_h
+                  opt_total_h = len(opts[:4]) * 100 if opts else 0
+                  gap = 60 if opts else 0
+                  content_h = q_total_h + gap + opt_total_h
+
+                  # 정 중앙
+                  start_y = BODY_Y + (BODY_H - content_h) // 2
+
+                  # 문제 그리기
+                  qy = start_y
+                  for line in lines:
+                      ww = tw(d, line, f_q)
+                      d.text(((W-ww)//2, qy), line, font=f_q, fill=TEXT_LT)
+                      qy += line_h
 
                   # 선택지
                   if opts:
-                      qy += 40
+                      qy += gap
+                      f_lbl = fnt(40)
                       f_opt = fnt(46)
                       lbls = ['A', 'B', 'C', 'D']
                       for i, opt in enumerate(opts[:4]):
-                          if qy + 80 > BODY_Y + BODY_H - 20:
-                              break
-                          # 배경
-                          d.rounded_rectangle([60, qy, W-60, qy+74], radius=10,
-                                              fill=(240,240,246))
+                          bx1, by1 = 60, qy
+                          bx2, by2 = W-60, qy+80
+                          d.rounded_rectangle([bx1,by1,bx2,by2], radius=12,
+                                              fill=(238,238,245))
                           # 라벨 원
-                          d.ellipse([68, qy+10, 68+54, qy+64], fill=DARK_FG)
-                          lbl_f = fnt(38)
-                          lw = tw(d, lbls[i], lbl_f)
-                          d.text((68+27-lw//2, qy+18), lbls[i], font=lbl_f, fill=WHITE_BG)
-                          # 텍스트
-                          d.text((140, qy+18), opt, font=fnt(44), fill=TEXT_LT)
-                          qy += 88
+                          d.ellipse([bx1+10, by1+10, bx1+62, by1+70],
+                                    fill=(30,30,42))
+                          lw = tw(d, lbls[i], f_lbl)
+                          d.text((bx1+36-lw//2, by1+18), lbls[i],
+                                 font=f_lbl, fill=WHITE_BG)
+                          d.text((bx1+80, by1+17), opt,
+                                 font=f_opt, fill=TEXT_LT)
+                          qy += 96
 
               else:
-                  # 정답 표시
-                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=(40,180,160))
+                  # 정답 화면
+                  ans = quiz.get('answer', '')
+                  exp = quiz.get('explanation', '')
 
-                  d.rectangle([60, BODY_Y+40, W-60, BODY_Y+50+6], fill=(220,220,228))
+                  # 정답 상단 바
+                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=GREEN_ANS)
+
                   f_albl = fnt(36)
                   albl_w = tw(d, '정  답', f_albl)
-                  d.text(((W-albl_w)//2, BODY_Y+30), '정  답', font=f_albl, fill=(130,130,145))
+                  d.text(((W-albl_w)//2, BODY_Y+36), '정  답',
+                         font=f_albl, fill=(140,150,165))
 
-                  f_ans = fit_font(d, ans, 920, [90,80,70,60,50])
+                  f_ans = fit_font(d, ans, 920, [96,84,72,60,50])
                   ay = BODY_Y + 110
-                  ay = cx(d, ans, ay, f_ans, (30,180,160), max_w=920, lsp=16)
+                  ay = cx(d, ans, ay, f_ans, GREEN_ANS, max_w=920, lsp=18)
 
-                  ay += 30
-                  d.rectangle([80, ay, W-80, ay+3], fill=(210,210,218))
-                  ay += 24
+                  ay += 36
+                  d.rectangle([80, ay, W-80, ay+3], fill=(210,215,225))
+                  ay += 28
 
                   f_elbl = fnt(34)
                   elbl_w = tw(d, '해  설', f_elbl)
-                  d.text(((W-elbl_w)//2, ay), '해  설', font=f_elbl, fill=(150,150,165))
-                  ay += 52
-                  d.rectangle([100, ay, W-100, ay+2], fill=(220,220,228))
-                  ay += 20
+                  d.text(((W-elbl_w)//2, ay), '해  설',
+                         font=f_elbl, fill=(150,155,170))
+                  ay += 54
+                  d.rectangle([100, ay, W-100, ay+2], fill=(220,225,232))
+                  ay += 24
 
                   f_exp = fit_font(d, exp, 900, [50,44,38,34])
-                  cx(d, exp, ay, f_exp, TEXT_LT, max_w=900, lsp=14)
+                  cx(d, exp, ay, f_exp, TEXT_LT, max_w=900, lsp=16)
 
               # ── 도트 카운터 ──
-              DOT_N    = 10
-              DOT_R    = 22
-              DOT_GAP  = 18
-              total_w  = DOT_N * (DOT_R*2) + (DOT_N-1) * DOT_GAP
-              dot_x0   = (W - total_w) // 2
-              dot_y    = FOOTER_Y + 36
+              DOT_N   = 10
+              DOT_R   = 24
+              DOT_GAP = 20
+              total_w = DOT_N*(DOT_R*2) + (DOT_N-1)*DOT_GAP
+              dot_x0  = (W - total_w) // 2
+              dot_area_h = H - body_bottom
+              dot_y = body_bottom + (dot_area_h // 2) - DOT_R - 28
 
               for i in range(DOT_N):
                   cx_dot = dot_x0 + i*(DOT_R*2+DOT_GAP) + DOT_R
                   color = DOT_ON if i < dot_filled else DOT_OFF
-                  d.ellipse([cx_dot-DOT_R, dot_y, cx_dot+DOT_R, dot_y+DOT_R*2], fill=color)
+                  d.ellipse([cx_dot-DOT_R, dot_y,
+                             cx_dot+DOT_R, dot_y+DOT_R*2], fill=color)
 
               # ── 푸터 텍스트 ──
-              f_footer = fnt(38)
-              if not show_answer:
-                  ft = '기다리면 정답이 나와요!'
-              else:
-                  ft = '팔로우하고 매일 퀴즈 받아보세요'
-              ft_w = tw(d, ft, f_footer)
-              d.text(((W-ft_w)//2, FOOTER_Y+110), ft, font=f_footer, fill=TEXT_GR)
+              f_ft = fnt(38)
+              ft = '팔로우하고 매일 퀴즈 받아보세요' if show_answer else '기다리면 정답이 나와요!'
+              ft_w = tw(d, ft, f_ft)
+              d.text(((W-ft_w)//2, dot_y + DOT_R*2 + 22), ft,
+                     font=f_ft, fill=(100,105,125))
 
               return img
 
-          # 도트 0 ~ 10 프레임 생성 (각 1초)
+          # 도트 0~10 (각 1초)
           for i in range(11):
-              frame = make_frame(dot_filled=i, show_answer=False)
-              frame.save(f'frames/q_{i:02d}.png')
-          print("Question frames done (0~10)")
+              make_frame(dot_filled=i, show_answer=False).save(f'frames/q_{i:02d}.png')
+          print("Question frames done")
 
           # 정답 프레임
-          ans_frame = make_frame(dot_filled=10, show_answer=True)
-          ans_frame.save('frames/answer.png')
+          make_frame(dot_filled=10, show_answer=True).save('frames/answer.png')
           print("Answer frame done")
           EOF
 
       - name: Compose video
         run: |
           set -e
-          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS OK: $(du -h narration.mp3)"
-          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM OK: $(du -h bgm.mp3)"
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true
 
           VF="scale=1080:1920:force_original_aspect_ratio=disable,setsar=1,fps=30"
 
-          # 도트 0~10 각 1초 영상
           for i in $(seq 0 10); do
             fi=$(printf "%02d" $i)
             ffmpeg -loop 1 -i frames/q_${fi}.png -t 1 \
-              -vf "${VF}" \
-              -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
+              -vf "${VF}" -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
               dot${fi}.mp4 -y -loglevel error
           done
 
-          # 정답 10초
           ffmpeg -loop 1 -i frames/answer.png -t 10 \
             -vf "${VF},fade=t=in:st=0:d=0.4" \
             -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
             ans.mp4 -y -loglevel error
 
-          # concat 파일 생성
           > cl.txt
           for i in $(seq 0 10); do
-            fi=$(printf "%02d" $i)
-            echo "file 'dot${fi}.mp4'" >> cl.txt
+            echo "file 'dot$(printf "%02d" $i).mp4'" >> cl.txt
           done
           echo "file 'ans.mp4'" >> cl.txt
 
@@ -323,28 +354,22 @@ jobs:
           DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
           echo "Duration: ${DUR}s"
 
-          # 오디오 믹싱
           if $has_tts && $has_bgm; then
             ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
-              -filter_complex \
-                "[1:a]apad,atrim=duration=${DUR}[tts];[2:a]apad,atrim=duration=${DUR},volume=0.15[bgm];[tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[a]" \
-              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel error
+              -filter_complex "[1:a]apad,atrim=duration=${DUR}[tts];[2:a]apad,atrim=duration=${DUR},volume=0.15[bgm];[tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k quiz_video.mp4 -y -loglevel error
           elif $has_tts; then
             ffmpeg -i merged.mp4 -i narration.mp3 \
               -filter_complex "[1:a]apad,atrim=duration=${DUR}[a]" \
-              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel error
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k quiz_video.mp4 -y -loglevel error
           elif $has_bgm; then
             ffmpeg -stream_loop -1 -i bgm.mp3 -i merged.mp4 \
               -filter_complex "[0:a]atrim=duration=${DUR},volume=0.3[a]" \
-              -map 1:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel error
+              -map 1:v -map "[a]" -c:v copy -c:a aac -b:a 192k quiz_video.mp4 -y -loglevel error
           else
             cp merged.mp4 quiz_video.mp4
           fi
 
-          echo "=== Final ==="
           ls -lh quiz_video.mp4
           ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
