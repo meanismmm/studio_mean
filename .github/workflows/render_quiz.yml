@@ -36,13 +36,11 @@ jobs:
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
           key = os.environ.get('GCP_TTS_KEY','')
-          print(f"TTS key: {bool(key)}")
           if not key:
               open('narration.mp3','wb').close()
               sys.exit(0)
           n = quiz.get('narration',{})
           text = ' '.join([n.get(k,'') for k in ['intro','question','countdown','answer','outro'] if n.get(k)])
-          print(f"Text length: {len(text)}")
           resp = requests.post(
               f'https://texttospeech.googleapis.com/v1/text:synthesize?key={key}',
               json={
@@ -51,42 +49,34 @@ jobs:
                   'audioConfig':{'audioEncoding':'MP3','speakingRate':1.0}
               }
           )
-          print(f"TTS status: {resp.status_code}")
           if resp.ok and resp.json().get('audioContent'):
               data = base64.b64decode(resp.json()['audioContent'])
               open('narration.mp3','wb').write(data)
-              print(f"TTS saved: {len(data)} bytes")
+              print(f"TTS: {len(data)} bytes")
           else:
-              print(f"TTS error: {resp.text[:200]}")
               open('narration.mp3','wb').close()
           EOF
 
-      - name: Generate BGM with FFmpeg
+      - name: Generate BGM
         run: |
           python3 << 'EOF'
           import json
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
-          diff = quiz.get('difficulty','normal')
           hook = quiz.get('hookTitle','')
           bright = any(k in hook for k in ['심리','상식','넌센스','쉬움'])
-          # 분위기별 파라미터
-          if bright:
-              expr = "0.06*sin(2*PI*261*t)+0.04*sin(2*PI*329*t)+0.03*sin(2*PI*392*t)+0.02*sin(2*PI*523*t)"
-          else:
-              expr = "0.07*sin(2*PI*55*t)+0.04*sin(2*PI*82*t)+0.02*sin(2*PI*110*t)+0.01*sin(2*PI*138*t)"
-          print(f"BGM mood: {'bright' if bright else 'mystery'}")
-          with open('bgm_expr.txt','w') as f:
-              f.write(expr)
+          with open('bright.txt','w') as f: f.write('1' if bright else '0')
           EOF
-
-          EXPR=$(cat bgm_expr.txt)
-          echo "Generating BGM..."
-          ffmpeg -f lavfi \
-            -i "aevalsrc=${EXPR}:s=44100" \
+          BRIGHT=$(cat bright.txt)
+          if [ "$BRIGHT" = "1" ]; then
+            EXPR="0.05*sin(2*PI*261*t)+0.04*sin(2*PI*329*t)+0.03*sin(2*PI*392*t)"
+          else
+            EXPR="0.06*sin(2*PI*55*t)+0.04*sin(2*PI*82*t)+0.02*sin(2*PI*110*t)+0.015*sin(2*PI*146*t)"
+          fi
+          ffmpeg -f lavfi -i "aevalsrc=${EXPR}:s=44100" \
             -af "afade=t=in:st=0:d=2,afade=t=out:st=35:d=2" \
             -t 37 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
-          echo "BGM generated: $(du -h bgm.mp3)"
+          echo "BGM: $(du -h bgm.mp3)"
 
       - name: Render frames
         run: |
@@ -100,231 +90,344 @@ jobs:
           W, H = 1080, 1920
           os.makedirs('frames', exist_ok=True)
 
-          BG     = (11,11,14)
-          CARD   = (22,22,28)
-          ACCENT = (91,127,255)
-          GOLD   = (255,209,102)
-          GREEN  = (78,205,196)
-          RED    = (255,100,100)
-          WHITE  = (240,240,248)
-          GRAY   = (130,130,148)
-          DIM    = (50,50,62)
+          # 컬러
+          BG      = (10, 10, 13)
+          ACCENT  = (91, 127, 255)
+          GOLD    = (255, 209, 102)
+          GREEN   = (78, 205, 196)
+          RED     = (255, 90, 90)
+          WHITE   = (245, 245, 252)
+          LGRAY   = (180, 180, 195)
+          MGRAY   = (100, 100, 115)
+          DGRAY   = (30, 30, 38)
+          CARD    = (20, 20, 26)
 
           def fnt(size):
               for p in [
                   '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
                   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
                   '/usr/share/fonts/noto-cjk/NotoSansCJKkr-Bold.otf',
-                  '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
               ]:
                   if os.path.exists(p):
                       try: return ImageFont.truetype(p, size)
                       except: pass
               return ImageFont.load_default()
 
-          def center(draw, text, y, font, color, max_w=940, spacing=12):
-              if not text: return y
+          def tw(d, text, font):
+              bb = d.textbbox((0,0), text, font=font)
+              return bb[2]-bb[0], bb[3]-bb[1]
+
+          def cx(d, text, y, font, color, max_w=980, lsp=14):
+              """중앙 정렬 텍스트 (줄바꿈 포함)"""
               words = text.split()
               lines, cur = [], ''
               for w in words:
                   t = (cur+' '+w).strip()
-                  if draw.textbbox((0,0),t,font=font)[2] > max_w and cur:
+                  if d.textbbox((0,0),t,font=font)[2] > max_w and cur:
                       lines.append(cur); cur = w
                   else: cur = t
               if cur: lines.append(cur)
               for line in lines:
-                  bb = draw.textbbox((0,0),line,font=font)
-                  tw = bb[2]-bb[0]
-                  draw.text(((W-tw)//2, y), line, font=font, fill=color)
-                  y += bb[3]-bb[1]+spacing
+                  ww, hh = tw(d, line, font)
+                  d.text(((W-ww)//2, y), line, font=font, fill=color)
+                  y += hh + lsp
               return y
 
-          def base(accent=ACCENT):
-              img = Image.new('RGB',(W,H),BG)
-              d = ImageDraw.Draw(img)
-              # 상단 바
-              d.rectangle([0,0,W,10], fill=accent)
-              # 하단 바
-              d.rectangle([0,H-10,W,H], fill=accent)
-              return img, d
+          def hline(d, y, color, thickness=3, margin=80):
+              d.rectangle([margin, y, W-margin, y+thickness], fill=color)
 
-          def card(d, x1,y1,x2,y2, r=20, fill=CARD, top_color=None):
-              d.rounded_rectangle([x1,y1,x2,y2], radius=r, fill=fill)
-              if top_color:
-                  d.rectangle([x1,y1,x2,y1+8], fill=top_color)
+          hook = quiz.get('hookTitle', '오늘의 퀴즈')
+          q    = quiz.get('question', '')
+          ans  = quiz.get('answer', '')
+          exp  = quiz.get('explanation', '')
+          opts = quiz.get('options', [])
+          diff = quiz.get('difficulty', 'normal')
+          dc   = {'easy': GREEN, 'normal': GOLD, 'hard': RED}.get(diff, GOLD)
+          dl   = {'easy': 'EASY', 'normal': 'NORMAL', 'hard': 'HARD'}.get(diff, 'NORMAL')
 
-          hook = quiz.get('hookTitle','오늘의 퀴즈')
-          q    = quiz.get('question','')
-          ans  = quiz.get('answer','')
-          exp  = quiz.get('explanation','')
-          opts = quiz.get('options',[])
-          diff = quiz.get('difficulty','normal')
-          dc   = {'easy':GREEN,'normal':GOLD,'hard':RED}.get(diff,GOLD)
-          dl   = {'easy':'EASY','normal':'NORMAL','hard':'HARD'}.get(diff,'NORMAL')
+          # ══════════════════════════════════════
+          # F1: 오프닝 (3초) — 풀스크린 임팩트
+          # ══════════════════════════════════════
+          img = Image.new('RGB', (W, H), BG)
+          d = ImageDraw.Draw(img)
 
-          # ── F1: Hook (3초) ──
-          img,d = base(ACCENT)
-          # 중앙 카드 (화면 중간에 위치)
-          card(d, 80, 700, W-80, 1150, top_color=ACCENT)
+          # 배경 그라데이션 느낌 (상단 어두운 포인트)
+          for i in range(400):
+              alpha = int(30 * (1 - i/400))
+              c = tuple(min(255, BG[j] + alpha) for j in range(3))
+              d.rectangle([0, i, W, i+1], fill=c)
+
+          # 상단 강조선
+          d.rectangle([0, 0, W, 6], fill=ACCENT)
+
+          # 중앙 메인 텍스트 영역
+          # 작은 태그라인
+          f_tag = fnt(38)
+          cx(d, '매일 퀴즈 도전!', 680, f_tag, MGRAY)
+
+          # 구분선
+          hline(d, 740, DGRAY)
+
+          # 메인 훅 타이틀 (크고 임팩트있게)
+          f_hook = fnt(92)
+          y = cx(d, hook, 790, f_hook, WHITE, max_w=940, lsp=16)
+
           # 난이도 뱃지
-          f34 = fnt(34)
-          bb = d.textbbox((0,0),dl,font=f34)
-          bw = bb[2]-bb[0]+40
-          d.rounded_rectangle([(W-bw)//2,728,(W+bw)//2,772], radius=8, fill=dc)
-          d.text(((W-(bb[2]-bb[0]))//2, 732), dl, font=f34, fill=BG)
-          # 제목
-          center(d, hook, 820, fnt(72), WHITE, max_w=880)
-          # 서브
-          center(d, '맞출 수 있을까요?', 1020, fnt(46), GRAY)
-          # 하단 안내
-          center(d, '[ 계속 보기 ]', 1840, fnt(32), DIM)
+          y += 30
+          btext = f'[ {dl} ]'
+          f_diff = fnt(42)
+          ww, hh = tw(d, btext, f_diff)
+          bx = (W - ww - 40) // 2
+          d.rounded_rectangle([bx, y, bx+ww+40, y+hh+20], radius=6, fill=dc)
+          d.text((bx+20, y+10), btext, font=f_diff, fill=BG)
+
+          # 하단 CTA
+          f_sub = fnt(40)
+          cx(d, '지금 바로 도전하세요', H-160, f_sub, MGRAY)
+
+          # 하단 강조선
+          d.rectangle([0, H-6, W, H], fill=ACCENT)
+
           img.save('frames/f1.png')
-          print(f"f1: {W}x{H}")
+          print("f1 done")
 
-          # ── F2: Question (15초) ──
-          img,d = base(ACCENT)
-          center(d, 'QUESTION', 160, fnt(42), ACCENT)
-          d.rectangle([100,220,W-100,224], fill=DIM)
-          card(d, 60, 260, W-60, int(H*0.62), top_color=ACCENT)
-          y = center(d, q, 320, fnt(62), WHITE, max_w=900, spacing=18)
+          # ══════════════════════════════════════
+          # F2: 문제 (15초) — 풀스크린 문제 카드
+          # ══════════════════════════════════════
+          img = Image.new('RGB', (W, H), BG)
+          d = ImageDraw.Draw(img)
+          d.rectangle([0, 0, W, 6], fill=ACCENT)
+          d.rectangle([0, H-6, W, H], fill=ACCENT)
+
+          # 상단 라벨
+          f_ql = fnt(36)
+          cx(d, 'Q U E S T I O N', 60, f_ql, ACCENT)
+          hline(d, 118, ACCENT, thickness=2)
+
+          # 문제 텍스트 — 화면 중앙에 크게
+          f_q = fnt(72)
+          # 문제를 세로 중앙에 배치
+          words = q.split()
+          lines, cur = [], ''
+          for w in words:
+              t = (cur+' '+w).strip()
+              if d.textbbox((0,0),t,font=f_q)[2] > 960 and cur:
+                  lines.append(cur); cur = w
+              else: cur = t
+          if cur: lines.append(cur)
+          total_h = len(lines) * (72 + 18)
+          q_start = (H - total_h) // 2 - 80
+          q_start = max(q_start, 200)
+          y = q_start
+          for line in lines:
+              ww, hh = tw(d, line, f_q)
+              d.text(((W-ww)//2, y), line, font=f_q, fill=WHITE)
+              y += hh + 18
+
+          # 선택지 (있을 경우)
           if opts:
-              y = max(y, 720)
-              for opt in opts[:4]:
-                  card(d, 100, y, W-100, y+72, r=12, fill=DIM)
-                  d.text((135, y+14), opt, font=fnt(46), fill=WHITE)
-                  y += 88
-          center(d, '생각해보세요...', int(H*0.64), fnt(42), GRAY)
-          center(d, '구독하면 매일 퀴즈', 1840, fnt(30), DIM)
-          img.save('frames/f2.png')
-          print(f"f2: {W}x{H}")
+              y += 40
+              f_opt = fnt(52)
+              for i, opt in enumerate(opts[:4]):
+                  labels = ['A', 'B', 'C', 'D']
+                  # 선택지 박스
+                  d.rounded_rectangle([80, y, W-80, y+80], radius=12, fill=DGRAY)
+                  # 라벨
+                  d.text((110, y+18), labels[i], font=f_opt, fill=ACCENT)
+                  # 텍스트
+                  d.text((170, y+18), opt, font=fnt(48), fill=WHITE)
+                  y += 96
 
-          # ── F3: 카운트다운 숫자 (각 1초) ──
-          for num in [5,4,3,2,1]:
-              img,d = base(GOLD)
-              card(d, 80, 700, W-80, 1180, top_color=GOLD)
-              center(d, '정답은...?', 740, fnt(46), GRAY)
-              f_big = fnt(280)
-              bb = d.textbbox((0,0), str(num), font=f_big)
-              d.text(((W-(bb[2]-bb[0]))//2, 800), str(num), font=f_big, fill=GOLD)
+          # 하단 힌트
+          f_hint = fnt(36)
+          cx(d, '잘 생각해보세요...', H-80, f_hint, MGRAY)
+
+          img.save('frames/f2.png')
+          print("f2 done")
+
+          # ══════════════════════════════════════
+          # F3: 카운트다운 (각 1초) — 숫자 풀스크린
+          # ══════════════════════════════════════
+          for num in [5, 4, 3, 2, 1]:
+              img = Image.new('RGB', (W, H), BG)
+              d = ImageDraw.Draw(img)
+              d.rectangle([0, 0, W, 6], fill=GOLD)
+              d.rectangle([0, H-6, W, H], fill=GOLD)
+
+              # 상단 텍스트
+              f_cd_top = fnt(44)
+              cx(d, '정답 공개까지...', 200, f_cd_top, MGRAY)
+
+              # 거대한 숫자 — 화면 중앙
+              f_num = fnt(520)
+              ww, hh = tw(d, str(num), f_num)
+              # 세로 중앙
+              ny = (H - hh) // 2 - 60
+              d.text(((W-ww)//2, ny), str(num), font=f_num, fill=GOLD)
+
+              # 하단
+              f_cd_bot = fnt(40)
+              cx(d, '정답을 생각해보셨나요?', H-120, f_cd_bot, MGRAY)
+
               img.save(f'frames/f3_{num}.png')
           print("f3 countdown done")
 
-          # ── F4: Answer (10초) ──
-          img,d = base(GREEN)
-          center(d, 'ANSWER', 160, fnt(42), GREEN)
-          d.rectangle([100,220,W-100,224], fill=DIM)
-          # 정답 카드
-          card(d, 60, 260, W-60, 540, top_color=GREEN)
-          center(d, '정  답', 290, fnt(38), GREEN)
-          center(d, ans, 365, fnt(86), WHITE, max_w=920)
-          # 해설 카드
-          card(d, 60, 580, W-60, 1120, top_color=DIM)
-          center(d, '해  설', 618, fnt(38), GRAY)
-          d.rectangle([100,668,W-100,672], fill=DIM)
-          center(d, exp, 696, fnt(48), WHITE, max_w=900, spacing=16)
-          img.save('frames/f4.png')
-          print(f"f4: {W}x{H}")
+          # ══════════════════════════════════════
+          # F4: 정답 (10초) — 임팩트 정답 공개
+          # ══════════════════════════════════════
+          img = Image.new('RGB', (W, H), BG)
+          d = ImageDraw.Draw(img)
+          d.rectangle([0, 0, W, 6], fill=GREEN)
+          d.rectangle([0, H-6, W, H], fill=GREEN)
 
-          # ── F5: CTA (4초) ──
-          img,d = base(ACCENT)
-          card(d, 60, 660, W-60, 1200, top_color=ACCENT)
-          center(d, '재미있었나요?', 720, fnt(68), WHITE)
-          center(d, '매일 새 퀴즈 업로드!', 870, fnt(52), GOLD)
-          d.rounded_rectangle([160, 980, W-160, 1080], radius=22, fill=ACCENT)
-          center(d, '좋아요 + 구독', 1002, fnt(54), WHITE)
-          center(d, '댓글로 정답 맞춰보세요', 1120, fnt(40), GRAY)
+          # 상단 ANSWER 라벨
+          f_al = fnt(36)
+          cx(d, 'A N S W E R', 60, f_al, GREEN)
+          hline(d, 118, GREEN, thickness=2)
+
+          # 정답 텍스트 — 크고 임팩트있게 중앙 상단
+          f_ans = fnt(100)
+          words = ans.split()
+          lines, cur = [], ''
+          for w in words:
+              t = (cur+' '+w).strip()
+              if d.textbbox((0,0),t,font=f_ans)[2] > 960 and cur:
+                  lines.append(cur); cur = w
+              else: cur = t
+          if cur: lines.append(cur)
+          y = 220
+          for line in lines:
+              ww, hh = tw(d, line, f_ans)
+              d.text(((W-ww)//2, y), line, font=f_ans, fill=GREEN)
+              y += hh + 16
+
+          # 구분선
+          y += 40
+          hline(d, y, DGRAY)
+          y += 30
+
+          # 해설
+          f_exp_label = fnt(36)
+          cx(d, '해  설', y, f_exp_label, MGRAY)
+          y += 60
+          hline(d, y, DGRAY, thickness=1, margin=120)
+          y += 30
+
+          f_exp = fnt(52)
+          words = exp.split()
+          lines, cur = [], ''
+          for w in words:
+              t = (cur+' '+w).strip()
+              if d.textbbox((0,0),t,font=f_exp)[2] > 900 and cur:
+                  lines.append(cur); cur = w
+              else: cur = t
+          if cur: lines.append(cur)
+          for line in lines:
+              ww, hh = tw(d, line, f_exp)
+              d.text(((W-ww)//2, y), line, font=f_exp, fill=LGRAY)
+              y += hh + 14
+
+          img.save('frames/f4.png')
+          print("f4 done")
+
+          # ══════════════════════════════════════
+          # F5: CTA (4초) — 구독 유도
+          # ══════════════════════════════════════
+          img = Image.new('RGB', (W, H), BG)
+          d = ImageDraw.Draw(img)
+          d.rectangle([0, 0, W, 6], fill=ACCENT)
+          d.rectangle([0, H-6, W, H], fill=ACCENT)
+
+          # 메인 텍스트들 세로 중앙 배치
+          f_c1 = fnt(80)
+          f_c2 = fnt(52)
+          f_c3 = fnt(44)
+          f_btn = fnt(58)
+
+          cx(d, '재미있었나요?', 580, f_c1, WHITE)
+          cx(d, '매일 새로운 퀴즈 업로드', 730, f_c2, GOLD)
+
+          # 구독 버튼
+          btn_y = 870
+          d.rounded_rectangle([120, btn_y, W-120, btn_y+100], radius=16, fill=ACCENT)
+          ww, hh = tw(d, '좋아요  +  구독', f_btn)
+          d.text(((W-ww)//2, btn_y+20), '좋아요  +  구독', font=f_btn, fill=WHITE)
+
+          cx(d, '댓글로 정답 맞춰보세요', 1010, f_c3, MGRAY)
+
+          hline(d, 1100, DGRAY)
+          cx(d, '다음 퀴즈도 기대해주세요', 1130, fnt(38), MGRAY)
+
           img.save('frames/f5.png')
-          print(f"f5: {W}x{H}")
+          print("f5 done")
           print("All frames done!")
           EOF
 
       - name: Compose video
         run: |
           set -e
-          echo "=== Audio check ==="
-          ls -lh narration.mp3 bgm.mp3 2>/dev/null || true
-          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: OK"
-          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: OK"
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: OK $(du -h narration.mp3)"
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: OK $(du -h bgm.mp3)"
 
-          echo "=== Verifying frames ==="
-          for f in frames/f1.png frames/f2.png frames/f3_5.png frames/f4.png frames/f5.png; do
-            python3 -c "
-          from PIL import Image
-          img = Image.open('$f')
-          print(f'$f: {img.size}')
-            "
-          done
+          VF="scale=1080:1920:force_original_aspect_ratio=disable,setsar=1,fps=30"
 
-          echo "=== Building video scenes ==="
-          VF_BASE="scale=1080:1920:force_original_aspect_ratio=disable,setsar=1,fps=30"
-
-          # Scene1: Hook 3초
+          # Scene1: 오프닝 3초
           ffmpeg -loop 1 -i frames/f1.png -t 3 \
-            -vf "${VF_BASE}" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-            s1.mp4 -y -loglevel warning
+            -vf "${VF},fade=t=in:st=0:d=0.3" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s1.mp4 -y -loglevel error
 
-          # Scene2: Question 15초 + 프로그레스바
+          # Scene2: 문제 15초 + 프로그레스바
           ffmpeg -loop 1 -i frames/f2.png -t 15 \
-            -vf "${VF_BASE},drawbox=x=0:y=1900:w='iw*t/15':h=20:color=5b7fff@1.0:t=fill" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-            s2.mp4 -y -loglevel warning
+            -vf "${VF},drawbox=x=0:y=1900:w='iw*t/15':h=20:color=5b7fff@1.0:t=fill" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s2.mp4 -y -loglevel error
 
-          # Scene3: 카운트다운 5→1 각 1초 페이드인
+          # Scene3: 카운트다운 각 1초 (숫자 줌인 효과)
           for num in 5 4 3 2 1; do
             ffmpeg -loop 1 -i frames/f3_${num}.png -t 1 \
-              -vf "${VF_BASE},fade=t=in:st=0:d=0.15" \
-              -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-              cd${num}.mp4 -y -loglevel warning
+              -vf "${VF},fade=t=in:st=0:d=0.1,zoompan=z='if(eq(on,1),1.05,max(1.0,zoom-0.05))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=30:s=1080x1920" \
+              -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
+              cd${num}.mp4 -y -loglevel error
           done
           printf "file 'cd5.mp4'\nfile 'cd4.mp4'\nfile 'cd3.mp4'\nfile 'cd2.mp4'\nfile 'cd1.mp4'\n" > cdlist.txt
-          ffmpeg -f concat -safe 0 -i cdlist.txt -c copy s3.mp4 -y -loglevel warning
+          ffmpeg -f concat -safe 0 -i cdlist.txt -c copy s3.mp4 -y -loglevel error
 
-          # Scene4: Answer 10초 페이드인
+          # Scene4: 정답 10초 (페이드인)
           ffmpeg -loop 1 -i frames/f4.png -t 10 \
-            -vf "${VF_BASE},fade=t=in:st=0:d=0.4" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-            s4.mp4 -y -loglevel warning
+            -vf "${VF},fade=t=in:st=0:d=0.5" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s4.mp4 -y -loglevel error
 
-          # Scene5: CTA 4초 페이드인
+          # Scene5: CTA 4초
           ffmpeg -loop 1 -i frames/f5.png -t 4 \
-            -vf "${VF_BASE},fade=t=in:st=0:d=0.3" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-            s5.mp4 -y -loglevel warning
+            -vf "${VF},fade=t=in:st=0:d=0.3" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s5.mp4 -y -loglevel error
 
-          # 합치기
           printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
-          ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel warning
+          ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel error
           DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
-          echo "Total duration: ${DUR}s"
+          echo "Duration: ${DUR}s"
 
-          echo "=== Audio mixing ==="
           if $has_tts && $has_bgm; then
-            echo "Mixing TTS + BGM"
             ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
               -filter_complex \
                 "[1:a]apad,atrim=duration=${DUR}[tts];
                  [2:a]apad,atrim=duration=${DUR},volume=0.15[bgm];
                  [tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[a]" \
               -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel warning
+              quiz_video.mp4 -y -loglevel error
           elif $has_tts; then
-            echo "TTS only"
             ffmpeg -i merged.mp4 -i narration.mp3 \
               -filter_complex "[1:a]apad,atrim=duration=${DUR}[a]" \
               -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel warning
+              quiz_video.mp4 -y -loglevel error
           elif $has_bgm; then
-            echo "BGM only"
             ffmpeg -stream_loop -1 -i bgm.mp3 -i merged.mp4 \
               -filter_complex "[0:a]atrim=duration=${DUR},volume=0.3[a]" \
               -map 1:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
-              quiz_video.mp4 -y -loglevel warning
+              quiz_video.mp4 -y -loglevel error
           else
             cp merged.mp4 quiz_video.mp4
           fi
 
-          echo "=== Final output ==="
           ls -lh quiz_video.mp4
           ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
