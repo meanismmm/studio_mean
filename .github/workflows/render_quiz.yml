@@ -1,0 +1,257 @@
+name: Quiz Video Renderer
+
+on:
+  repository_dispatch:
+    types: [render_quiz]
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg & fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-noto-cjk imagemagick
+          fc-cache -fv
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install requests pillow
+
+      - name: Prepare quiz data
+        env:
+          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
+        run: |
+          echo "$QUIZ_DATA" > quiz_data.json
+          echo "Quiz data saved:"
+          cat quiz_data.json
+
+      - name: Generate TTS narration
+        env:
+          GCP_TTS_KEY: ${{ secrets.GCP_TTS_KEY }}
+          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
+        run: |
+          python3 << 'EOF'
+          import json, requests, base64, os
+
+          with open('quiz_data.json', 'r') as f:
+              quiz = json.load(f)
+
+          tts_key = os.environ.get('GCP_TTS_KEY', '')
+          narration = quiz.get('narration', {})
+          full_text = (
+              narration.get('intro', '') + ' ' +
+              narration.get('question', '') + ' ' +
+              narration.get('countdown', '') + ' ' +
+              narration.get('answer', '') + ' ' +
+              narration.get('outro', '')
+          )
+
+          if tts_key:
+              resp = requests.post(
+                  f'https://texttospeech.googleapis.com/v1/text:synthesize?key={tts_key}',
+                  json={
+                      'input': {'text': full_text},
+                      'voice': {'languageCode': 'ko-KR', 'name': 'ko-KR-Wavenet-C', 'ssmlGender': 'FEMALE'},
+                      'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 1.05}
+                  }
+              )
+              if resp.ok:
+                  audio_b64 = resp.json().get('audioContent', '')
+                  with open('narration.mp3', 'wb') as f:
+                      f.write(base64.b64decode(audio_b64))
+                  print("TTS generated successfully")
+              else:
+                  print(f"TTS failed: {resp.status_code}")
+          else:
+              # TTS 키 없으면 무음 mp3 생성
+              open('narration.mp3', 'wb').close()
+              print("No TTS key, using silence")
+          EOF
+
+      - name: Render quiz video frames
+        env:
+          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
+        run: |
+          python3 << 'EOF'
+          import json, subprocess, os
+          from PIL import Image, ImageDraw, ImageFont
+
+          with open('quiz_data.json', 'r') as f:
+              quiz = json.load(f)
+
+          W, H = 1080, 1920
+          BG_DARK = (13, 13, 15)
+          BG_CARD = (28, 28, 33)
+          ACCENT = (91, 127, 255)
+          ACCENT_GOLD = (255, 209, 102)
+          GREEN = (78, 205, 196)
+          WHITE = (232, 232, 240)
+          GRAY = (122, 122, 140)
+
+          def make_frame(bg_color, elements, filename):
+              img = Image.new('RGB', (W, H), bg_color)
+              draw = ImageDraw.Draw(img)
+
+              # 상단 장식선
+              draw.rectangle([0, 0, W, 6], fill=ACCENT)
+
+              for el in elements:
+                  el_type = el.get('type')
+                  x = el.get('x', W//2)
+                  y = el.get('y', H//2)
+                  text = str(el.get('text', ''))
+                  color = el.get('color', WHITE)
+                  size = el.get('size', 48)
+                  align = el.get('align', 'center')
+
+                  # 폰트 시도
+                  font = None
+                  for font_path in [
+                      '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+                      '/usr/share/fonts/noto-cjk/NotoSansCJKkr-Bold.otf',
+                      '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
+                  ]:
+                      if os.path.exists(font_path):
+                          try:
+                              font = ImageFont.truetype(font_path, size)
+                              break
+                          except: pass
+                  if not font:
+                      font = ImageFont.load_default()
+
+                  if el_type == 'rect':
+                      rx, ry = el.get('rx', 60), el.get('ry', 60)
+                      rw, rh = el.get('rw', 960), el.get('rh', 200)
+                      draw.rounded_rectangle([rx, ry, rx+rw, ry+rh], radius=20, fill=el.get('fill', BG_CARD))
+                  elif el_type == 'text':
+                      # 텍스트 줄 바꿈
+                      words = text.split()
+                      lines = []
+                      line = ''
+                      for word in words:
+                          test = (line + ' ' + word).strip()
+                          bbox = draw.textbbox((0,0), test, font=font)
+                          if bbox[2] - bbox[0] > 960:
+                              if line: lines.append(line)
+                              line = word
+                          else:
+                              line = test
+                      if line: lines.append(line)
+
+                      total_h = len(lines) * (size + 8)
+                      cur_y = y - total_h // 2
+                      for line in lines:
+                          bbox = draw.textbbox((0,0), line, font=font)
+                          tw = bbox[2] - bbox[0]
+                          cur_x = (W - tw) // 2 if align == 'center' else x
+                          draw.text((cur_x, cur_y), line, font=font, fill=color)
+                          cur_y += size + 8
+
+              img.save(filename)
+              print(f"Saved: {filename}")
+
+          hook_title = quiz.get('hookTitle', '오늘의 퀴즈')
+          question = quiz.get('question', '')
+          answer = quiz.get('answer', '')
+          explanation = quiz.get('explanation', '')
+          options = quiz.get('options', [])
+          captions = quiz.get('captions', {})
+
+          os.makedirs('frames', exist_ok=True)
+
+          # 프레임 1: 훅 타이틀 (3초 = 90프레임)
+          make_frame(BG_DARK, [
+              {'type': 'text', 'text': hook_title, 'y': 800, 'size': 72, 'color': ACCENT_GOLD},
+              {'type': 'text', 'text': captions.get('hook', '맞출 수 있을까요?'), 'y': 920, 'size': 48, 'color': GRAY},
+          ], 'frames/frame_hook.png')
+
+          # 프레임 2: 문제 (15초)
+          opts_text = '  /  '.join(options) if options else ''
+          make_frame(BG_DARK, [
+              {'type': 'text', 'text': '[ 문 제 ]', 'y': 640, 'size': 36, 'color': GRAY},
+              {'type': 'text', 'text': question, 'y': 780, 'size': 58, 'color': WHITE},
+              {'type': 'text', 'text': opts_text, 'y': 960, 'size': 40, 'color': GRAY},
+          ], 'frames/frame_question.png')
+
+          # 프레임 3: 카운트다운 (5초)
+          make_frame(BG_DARK, [
+              {'type': 'text', 'text': '⏱', 'y': 760, 'size': 120, 'color': ACCENT},
+              {'type': 'text', 'text': captions.get('countdown', '3  2  1'), 'y': 940, 'size': 80, 'color': WHITE},
+          ], 'frames/frame_countdown.png')
+
+          # 프레임 4: 정답 (10초)
+          make_frame(BG_DARK, [
+              {'type': 'text', 'text': '정 답', 'y': 620, 'size': 40, 'color': GRAY},
+              {'type': 'text', 'text': answer, 'y': 780, 'size': 80, 'color': GREEN},
+              {'type': 'text', 'text': explanation[:40] + ('...' if len(explanation)>40 else ''),
+               'y': 960, 'size': 36, 'color': GRAY},
+          ], 'frames/frame_answer.png')
+
+          # 프레임 5: CTA (3초)
+          make_frame(BG_DARK, [
+              {'type': 'text', 'text': '구독하면 매일 퀴즈!', 'y': 800, 'size': 60, 'color': ACCENT_GOLD},
+              {'type': 'text', 'text': '좋아요 & 구독 👍', 'y': 920, 'size': 48, 'color': WHITE},
+          ], 'frames/frame_cta.png')
+
+          print("All frames generated!")
+          EOF
+
+      - name: Compose video with FFmpeg
+        run: |
+          # 나레이션 mp3 유효성 확인
+          if [ ! -s narration.mp3 ]; then
+            # 무음 오디오 생성 (36초)
+            ffmpeg -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -t 36 -q:a 9 -acodec libmp3lame silence.mp3 -y
+            mv silence.mp3 narration.mp3
+          fi
+
+          # 각 장면별 정지 영상 생성
+          ffmpeg -loop 1 -i frames/frame_hook.png -t 3 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene1.mp4 -y
+          ffmpeg -loop 1 -i frames/frame_question.png -t 15 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene2.mp4 -y
+          ffmpeg -loop 1 -i frames/frame_countdown.png -t 5 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene3.mp4 -y
+          ffmpeg -loop 1 -i frames/frame_answer.png -t 10 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene4.mp4 -y
+          ffmpeg -loop 1 -i frames/frame_cta.png -t 3 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene5.mp4 -y
+
+          # 영상 concat
+          echo "file 'scene1.mp4'" > concat.txt
+          echo "file 'scene2.mp4'" >> concat.txt
+          echo "file 'scene3.mp4'" >> concat.txt
+          echo "file 'scene4.mp4'" >> concat.txt
+          echo "file 'scene5.mp4'" >> concat.txt
+
+          ffmpeg -f concat -safe 0 -i concat.txt -c copy merged.mp4 -y
+
+          # 나레이션 합성 (영상 길이에 맞게 trim)
+          VIDEO_DURATION=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
+          ffmpeg -i merged.mp4 -i narration.mp3 \
+            -filter_complex "[1:a]atrim=duration=${VIDEO_DURATION}[a]" \
+            -map 0:v -map "[a]" \
+            -c:v copy -c:a aac -shortest \
+            quiz_video.mp4 -y
+
+          echo "Video rendering complete!"
+          ls -lh quiz_video.mp4
+
+      - name: Upload video as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz-video-${{ github.run_number }}
+          path: quiz_video.mp4
+          retention-days: 7
+
+      - name: Upload frames as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz-frames-${{ github.run_number }}
+          path: frames/
+          retention-days: 3
