@@ -84,7 +84,6 @@ jobs:
           ffmpeg -f lavfi -i "aevalsrc=${EXPR}:s=44100" \
             -af "afade=t=in:st=0:d=1,afade=t=out:st=28:d=2" \
             -t 30 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
-          echo "BGM: $(du -h bgm.mp3)"
 
       - name: Render frames
         run: |
@@ -98,7 +97,6 @@ jobs:
           W, H = 1080, 1920
           os.makedirs('frames', exist_ok=True)
 
-          # 컬러
           WHITE_BG  = (250, 250, 252)
           TEXT_LT   = (24, 24, 30)
           TEXT_GR   = (160, 160, 175)
@@ -106,8 +104,8 @@ jobs:
           DOT_OFF   = (200, 200, 212)
           DOT_ON    = (30, 30, 42)
           GREEN_ANS = (32, 178, 158)
+          DARK_LBL  = (30, 30, 42)
 
-          # 레이아웃
           HEADER_H = 480
           BODY_Y   = HEADER_H
           BODY_H   = 1180
@@ -135,7 +133,8 @@ jobs:
                   if tw(d, text, f) <= max_w: return f
               return fnt(sizes[-1])
 
-          def cx(d, text, y, font, color, max_w=960, lsp=16):
+          def get_lines(d, text, font, max_w):
+              """텍스트를 줄바꿈하여 lines 리스트 반환"""
               words = text.split()
               lines, cur = [], ''
               for w in words:
@@ -147,157 +146,172 @@ jobs:
               if len(lines)==1 and tw(d, lines[0], font) > max_w:
                   t = lines[0]; mid = len(t)//2
                   lines = [t[:mid], t[mid:]]
+              return lines
+
+          def draw_lines_centered(d, lines, y, font, color, lsp=24):
+              """줄 목록을 중앙 정렬로 그리기, 최종 y 반환"""
               for line in lines:
                   ww = tw(d, line, font)
                   d.text(((W-ww)//2, y), line, font=font, fill=color)
                   y += th(d, line, font) + lsp
               return y
 
+          def draw_label_circle(d, cx, cy, r, text, font, bg, fg):
+              """원 안에 텍스트 정확히 중앙 정렬"""
+              d.ellipse([cx-r, cy-r, cx+r, cy+r], fill=bg)
+              bb = d.textbbox((0,0), text, font=font)
+              tw_ = bb[2]-bb[0]
+              th_ = bb[3]-bb[1]
+              # textbbox의 offset 보정
+              tx = cx - tw_//2 - bb[0]
+              ty = cy - th_//2 - bb[1]
+              d.text((tx, ty), text, font=font, fill=fg)
+
           def make_dark_gradient():
-              """다크 헤더용 그라데이션 (딥네이비 → 다크슬레이트)"""
               img = Image.new('RGB', (W, HEADER_H))
               d = ImageDraw.Draw(img)
-              top    = (14, 16, 28)   # 딥 네이비
-              bottom = (26, 28, 42)   # 다크 슬레이트
+              top    = (14, 16, 28)
+              bottom = (26, 28, 42)
               for y in range(HEADER_H):
                   t = y / HEADER_H
-                  r = int(top[0] + (bottom[0]-top[0]) * t)
-                  g = int(top[1] + (bottom[1]-top[1]) * t)
-                  b = int(top[2] + (bottom[2]-top[2]) * t)
-                  d.rectangle([0, y, W, y+1], fill=(r,g,b))
+                  r = int(top[0]+(bottom[0]-top[0])*t)
+                  g = int(top[1]+(bottom[1]-top[1])*t)
+                  b = int(top[2]+(bottom[2]-top[2])*t)
+                  d.rectangle([0,y,W,y+1], fill=(r,g,b))
               return img
 
           def make_frame(dot_filled=0, show_answer=False):
               img = Image.new('RGB', (W, H), WHITE_BG)
               d = ImageDraw.Draw(img)
 
-              # ── 헤더: 그라데이션 배경 ──
+              # ── 헤더 ──
               header = make_dark_gradient()
-              img.paste(header, (0, 0))
+              img.paste(header, (0,0))
               d = ImageDraw.Draw(img)
+              d.rectangle([0,0,W,5], fill=(91,127,255))
 
-              # 상단 얇은 포인트 라인
-              ACCENT_LINE = (91, 127, 255)
-              d.rectangle([0, 0, W, 5], fill=ACCENT_LINE)
-
-              # 태그라인
               f_tag = fnt(38)
               tag = '매일 30초 퀴즈!'
               d.text(((W-tw(d,tag,f_tag))//2, 52), tag, font=f_tag, fill=(130,140,175))
+              d.rectangle([80,108,W-80,111], fill=(50,54,80))
 
-              # 구분선
-              d.rectangle([80, 108, W-80, 111], fill=(50,54,80))
-
-              # 제목: 항상 '정답을 맞춰보세요' 고정
               fixed_title = '정답을 맞춰보세요'
               f_title = fnt(74)
-              title_w = tw(d, fixed_title, f_title)
-              # 헤더 세로 중앙 (108 ~ HEADER_H)
               title_area_h = HEADER_H - 130
               title_h = th(d, fixed_title, f_title)
               title_y = 130 + (title_area_h - title_h) // 2
-              d.text(((W-title_w)//2, title_y), fixed_title, font=f_title, fill=TEXT_WHT)
+              d.text(((W-tw(d,fixed_title,f_title))//2, title_y),
+                     fixed_title, font=f_title, fill=TEXT_WHT)
+              d.rectangle([0,HEADER_H-4,W,HEADER_H], fill=(40,44,68))
 
-              # 헤더 하단 구분선 (흰 본문과 경계)
-              d.rectangle([0, HEADER_H-4, W, HEADER_H], fill=(40,44,68))
-
-              # ── 본문: 흰 배경 ──
+              # ── 본문 ──
               body_bottom = BODY_Y + BODY_H
-              d.rectangle([0, BODY_Y, W, body_bottom], fill=WHITE_BG)
+              d.rectangle([0,BODY_Y,W,body_bottom], fill=WHITE_BG)
 
               if not show_answer:
-                  # 문제 텍스트 세로 중앙 정렬
-                  q = quiz.get('question', '')
-                  opts = quiz.get('options', [])
+                  # 문제 화면
+                  q    = quiz.get('question','')
+                  opts = quiz.get('options',[])
+
                   f_q = fit_font(d, q, 900, [68,60,54,48,42])
+                  q_lines = get_lines(d, q, f_q, 900)
+                  line_h  = th(d, q_lines[0], f_q) + 28
+                  q_total_h = len(q_lines) * line_h
 
-                  # 줄 계산
-                  words = q.split()
-                  lines, cur = [], ''
-                  for w in words:
-                      t2 = (cur+' '+w).strip()
-                      if tw(d, t2, f_q) > 900 and cur:
-                          lines.append(cur); cur = w
-                      else: cur = t2
-                  if cur: lines.append(cur)
-
-                  line_h = th(d, lines[0], f_q) + 28
-                  q_total_h = len(lines) * line_h
-                  opt_total_h = len(opts[:4]) * 100 if opts else 0
-                  gap = 60 if opts else 0
+                  OPT_H   = 92
+                  OPT_GAP = 8
+                  opt_n   = len(opts[:4])
+                  opt_total_h = opt_n * (OPT_H + OPT_GAP) if opts else 0
+                  gap = 52 if opts else 0
                   content_h = q_total_h + gap + opt_total_h
 
-                  # 정 중앙
                   start_y = BODY_Y + (BODY_H - content_h) // 2
 
-                  # 문제 그리기
+                  # 문제 텍스트
                   qy = start_y
-                  for line in lines:
-                      ww = tw(d, line, f_q)
-                      d.text(((W-ww)//2, qy), line, font=f_q, fill=TEXT_LT)
-                      qy += line_h
+                  qy = draw_lines_centered(d, q_lines, qy, f_q, TEXT_LT, lsp=28)
 
                   # 선택지
                   if opts:
                       qy += gap
                       f_lbl = fnt(40)
                       f_opt = fnt(46)
-                      lbls = ['A', 'B', 'C', 'D']
+                      lbls = ['A','B','C','D']
+                      CIRCLE_R = 32
                       for i, opt in enumerate(opts[:4]):
                           bx1, by1 = 60, qy
-                          bx2, by2 = W-60, qy+80
-                          d.rounded_rectangle([bx1,by1,bx2,by2], radius=12,
-                                              fill=(238,238,245))
-                          # 라벨 원
-                          d.ellipse([bx1+10, by1+10, bx1+62, by1+70],
-                                    fill=(30,30,42))
-                          lw = tw(d, lbls[i], f_lbl)
-                          d.text((bx1+36-lw//2, by1+18), lbls[i],
-                                 font=f_lbl, fill=WHITE_BG)
-                          d.text((bx1+80, by1+17), opt,
-                                 font=f_opt, fill=TEXT_LT)
-                          qy += 96
+                          bx2, by2 = W-60, qy+OPT_H
+                          d.rounded_rectangle([bx1,by1,bx2,by2],
+                                              radius=12, fill=(238,238,245))
+                          # 원형 라벨 — 정확한 중앙 정렬
+                          cx_c = bx1 + 16 + CIRCLE_R
+                          cy_c = by1 + OPT_H//2
+                          draw_label_circle(d, cx_c, cy_c, CIRCLE_R,
+                                            lbls[i], f_lbl, DARK_LBL, WHITE_BG)
+                          # 선택지 텍스트
+                          text_x = bx1 + 16 + CIRCLE_R*2 + 18
+                          text_y = by1 + (OPT_H - th(d, opt, f_opt))//2
+                          d.text((text_x, text_y), opt, font=f_opt, fill=TEXT_LT)
+                          qy += OPT_H + OPT_GAP
 
               else:
-                  # 정답 화면
-                  ans = quiz.get('answer', '')
-                  exp = quiz.get('explanation', '')
+                  # 정답 화면 — 세로 중앙 정렬
+                  ans = quiz.get('answer','')
+                  exp = quiz.get('explanation','')
 
-                  # 정답 상단 바
-                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=GREEN_ANS)
+                  d.rectangle([0,BODY_Y,W,BODY_Y+6], fill=GREEN_ANS)
 
+                  # 높이 사전 계산
                   f_albl = fnt(36)
-                  albl_w = tw(d, '정  답', f_albl)
-                  d.text(((W-albl_w)//2, BODY_Y+36), '정  답',
-                         font=f_albl, fill=(140,150,165))
-
-                  f_ans = fit_font(d, ans, 920, [96,84,72,60,50])
-                  ay = BODY_Y + 110
-                  ay = cx(d, ans, ay, f_ans, GREEN_ANS, max_w=920, lsp=18)
-
-                  ay += 36
-                  d.rectangle([80, ay, W-80, ay+3], fill=(210,215,225))
-                  ay += 28
-
+                  f_ans  = fit_font(d, ans, 920, [96,84,72,60,50])
                   f_elbl = fnt(34)
-                  elbl_w = tw(d, '해  설', f_elbl)
-                  d.text(((W-elbl_w)//2, ay), '해  설',
-                         font=f_elbl, fill=(150,155,170))
-                  ay += 54
-                  d.rectangle([100, ay, W-100, ay+2], fill=(220,225,232))
-                  ay += 24
+                  f_exp  = fit_font(d, exp, 900, [50,44,38,34])
 
-                  f_exp = fit_font(d, exp, 900, [50,44,38,34])
-                  cx(d, exp, ay, f_exp, TEXT_LT, max_w=900, lsp=16)
+                  ans_lines = get_lines(d, ans, f_ans, 920)
+                  exp_lines = get_lines(d, exp, f_exp, 900)
+
+                  albl_h  = th(d, '정  답', f_albl) + 12
+                  ans_h   = sum(th(d, l, f_ans)+22 for l in ans_lines)
+                  sep_h   = 60   # 구분선 + 여백
+                  elbl_h  = th(d, '해  설', f_elbl) + 12
+                  exp_h   = sum(th(d, l, f_exp)+16 for l in exp_lines)
+
+                  content_h = albl_h + ans_h + sep_h + elbl_h + 20 + exp_h
+                  start_y = BODY_Y + 6 + (BODY_H - 6 - content_h) // 2
+
+                  y = start_y
+
+                  # 정답 라벨
+                  albl_w = tw(d, '정  답', f_albl)
+                  d.text(((W-albl_w)//2, y), '정  답', font=f_albl, fill=(140,150,165))
+                  y += albl_h
+
+                  # 정답 텍스트
+                  y = draw_lines_centered(d, ans_lines, y, f_ans, GREEN_ANS, lsp=22)
+
+                  # 구분선
+                  y += 20
+                  d.rectangle([80,y,W-80,y+3], fill=(210,215,225))
+                  y += 20
+
+                  # 해설 라벨
+                  elbl_w = tw(d, '해  설', f_elbl)
+                  d.text(((W-elbl_w)//2, y), '해  설', font=f_elbl, fill=(150,155,170))
+                  y += elbl_h
+                  d.rectangle([100,y,W-100,y+2], fill=(220,225,232))
+                  y += 20
+
+                  # 해설 텍스트
+                  draw_lines_centered(d, exp_lines, y, f_exp, TEXT_LT, lsp=16)
 
               # ── 도트 카운터 ──
               DOT_N   = 10
               DOT_R   = 24
               DOT_GAP = 20
-              total_w = DOT_N*(DOT_R*2) + (DOT_N-1)*DOT_GAP
-              dot_x0  = (W - total_w) // 2
+              total_w = DOT_N*(DOT_R*2)+(DOT_N-1)*DOT_GAP
+              dot_x0  = (W-total_w)//2
               dot_area_h = H - body_bottom
-              dot_y = body_bottom + (dot_area_h // 2) - DOT_R - 28
+              dot_y = body_bottom + (dot_area_h//2) - DOT_R - 28
 
               for i in range(DOT_N):
                   cx_dot = dot_x0 + i*(DOT_R*2+DOT_GAP) + DOT_R
@@ -305,21 +319,19 @@ jobs:
                   d.ellipse([cx_dot-DOT_R, dot_y,
                              cx_dot+DOT_R, dot_y+DOT_R*2], fill=color)
 
-              # ── 푸터 텍스트 ──
+              # ── 푸터 ──
               f_ft = fnt(38)
               ft = '팔로우하고 매일 퀴즈 받아보세요' if show_answer else '기다리면 정답이 나와요!'
               ft_w = tw(d, ft, f_ft)
-              d.text(((W-ft_w)//2, dot_y + DOT_R*2 + 22), ft,
+              d.text(((W-ft_w)//2, dot_y+DOT_R*2+22), ft,
                      font=f_ft, fill=(100,105,125))
 
               return img
 
-          # 도트 0~10 (각 1초)
           for i in range(11):
               make_frame(dot_filled=i, show_answer=False).save(f'frames/q_{i:02d}.png')
           print("Question frames done")
 
-          # 정답 프레임
           make_frame(dot_filled=10, show_answer=True).save('frames/answer.png')
           print("Answer frame done")
           EOF
