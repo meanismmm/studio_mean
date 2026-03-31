@@ -12,8 +12,7 @@ async function recommendPsychTopics() {
       `인천 가로수 정신건강의학과 네이버 블로그 포스팅 주제 5개를 추천해주세요.
 제외 주제: ${exclude.length ? exclude.join(', ') : '없음'}
 의원급 진료 가능 질환, 네이버 검색량 있는 주제, 카테고리 다양하게.
-
-반드시 아래 형식으로만 답하세요. 번호와 제목만:
+반드시 번호 목록으로만:
 1. 제목1
 2. 제목2
 3. 제목3
@@ -47,13 +46,35 @@ async function generatePsychPost(title) {
   try {
     const result = await callClaude(
       `당신은 인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 작가입니다.
-따뜻하고 공감적인 의사 어투로 작성합니다.
-(사진) 표시를 각 단락 사이에 넣어주세요.
-마지막에 반드시 "인천 가로수 정신건강의학과 이성철 원장" 을 넣어주세요.`,
-      `다음 주제로 네이버 블로그 글을 작성해주세요: ${title}
-800자 이상, SEO 최적화, 소제목 포함, (사진) 위치 표시 포함.
-제목도 맨 위에 써주세요.`,
-      2000
+
+[글쓰기 원칙]
+- 따뜻하고 공감적인 의사 어투. 환자의 감정에 먼저 공감한 뒤 의학 정보 제공.
+- 어렵지 않은 언어로, 하지만 전문성이 느껴지게.
+- 매번 새로운 도입부와 비유 사용. 절대 유사문서 금지.
+- 네이버 SEO: 제목에 키워드와 "인천 가로수 정신건강의학과" 포함.
+
+[문단 구성 - 반드시 이 순서와 형식을 지키세요]
+제목
+(한 줄 공백)
+서두: 주제를 소개하는 1~2문장 짧은 서론
+(지도)
+1문단: 도입 - 환자 공감, 감성적 도입 (250자 내외)
+(사진)
+2문단: 질환/증상 설명 (250자 내외)
+(사진)
+3문단: 원인 또는 오해와 진실 (250자 내외)
+(사진)
+4문단: 방치 시 위험성 또는 치료 필요성 (250자 내외)
+(사진)
+5문단: 치료 방법과 회복 가능성 (250자 내외)
+(사진)
+---
+맺음말: 희망적이고 따뜻한 마무리 2~3문장
+인천 가로수 정신건강의학과 이성철 원장
+
+총 글자 수: 1500~1800자`,
+      `다음 주제로 블로그 글을 위 형식에 맞게 작성해주세요: ${title}`,
+      2500
     );
     document.getElementById('psychTitleBox').textContent = title;
     document.getElementById('psychOutput').textContent = result;
@@ -61,7 +82,7 @@ async function generatePsychPost(title) {
     const imgList = document.getElementById('psychImageList');
     imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">이미지 검색 중...</div>';
     try {
-      const images = await searchPexels('mental health therapy', 5);
+      const images = await searchPexels('mental health therapy calm', 5);
       if (images.length) {
         imgList.innerHTML = images.map((img, i) =>
           `<div class="image-link-item"><span style="color:#4a4a5a;font-size:11px;min-width:20px">${i+1}</span><a href="${img.src}" target="_blank">${img.src}</a><button class="btn-sm" onclick="navigator.clipboard.writeText('${img.src}').then(()=>showToast('복사됨!'))">복사</button></div>`
@@ -88,7 +109,8 @@ async function recommendTistoryTopics() {
     const result = await callClaude(
       '당신은 티스토리 개인 블로그 주제 기획자입니다.',
       `카테고리: ${catNames}
-공감되고 유머있는 개인 블로그 주제 5개를 번호 목록으로만 답해주세요.
+개인 블로그 포스팅 주제 5개. 시니컬하고 직설적인 1인칭 시점으로 쓸 수 있는 주제.
+반드시 번호 목록으로만:
 1. 제목1
 2. 제목2
 3. 제목3
@@ -122,10 +144,30 @@ async function generateTistoryPost(title) {
   try {
     const result = await callClaude(
       `당신은 티스토리 개인 블로그 작가입니다.
-1인칭, 솔직하고 유머있는 구어체로 씁니다.
-소제목은 ## 형식으로, 사진 위치는 (사진) 으로 표시해주세요.`,
-      `다음 주제로 티스토리 블로그 글을 작성해주세요: ${title}
-800자 이상, 소제목 포함, (사진) 위치 표시, 마지막은 "끝이다." 류로 마무리.`,
+
+[톤앤매너 - 매우 중요]
+아래 샘플의 문체를 정확히 분석하고 따르세요.
+
+샘플1 도입부:
+"분명하게 말하지만, 이 글은 나태하게 살라는 말을 하려는 것은 아니다. 갓생이든 뭐든 무언가에 몰입하고 어제보다 나은 상태를 지향하는 행동은 인간을 인간답게 만드는 훌륭한 동력이고 분명 사람을 더 발전하게 만들지도 모른, 아니, 발전하게 만든다."
+
+샘플2 도입부:
+"나는 주택에 산다. 겨울이면, 아파트나 빌라, 원룸이 아닌 일반 개인주택-국민주택들은 수도관이 어는 경우가 왕왕 있는데 지난주 역대급 한파에 수도관이 얼어 버려서 집에 물이 안나온다. 아, 이제 짜증이 난다."
+
+샘플3 소제목 내용:
+"갓생이라는 단어가 유행할 무렵부터 우리는 우리도 모르는 사이 삶의 모든 순간을 '숫자'로 치환하려는 강박을 느끼게 되지 않았나 생각이 든다. 인생은 엑셀 시트가 아니다."
+
+[핵심 문체 특징]
+- 1인칭. 자기 생각을 직설적으로 밀어붙임
+- 시니컬하되 히스테릭하지 않음. 냉소적이지만 설득력 있음
+- 구어체이되 문장력이 있음. 비유가 구체적이고 날카로움
+- 웃기려는 게 아니라 그냥 솔직한 것
+- 소제목은 짧고 직관적으로
+- 마무리는 짧게 끊음. "끝이다." 스타일
+
+[형식]
+소제목은 ## 형식, 사진 위치는 (사진) 표시, 총 1000자 내외`,
+      `다음 주제로 위 톤앤매너에 맞게 티스토리 블로그 글을 작성해주세요: ${title}`,
       2000
     );
     document.getElementById('tistoryTitleBox').textContent = title;
