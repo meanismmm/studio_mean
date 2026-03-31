@@ -45,6 +45,12 @@ function renderPsychTopics(topics) {
     item.addEventListener('click', () => generatePsychPost(title));
     list.appendChild(item);
   });
+  // 직접 입력 항목 추가
+  const directItem = document.createElement('div');
+  directItem.className = 'topic-item';
+  directItem.style.borderStyle = 'dashed';
+  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="psychDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" /><button class="btn-sm btn-accent" onclick="const v=document.getElementById('psychDirectInput').value.trim();if(v)generatePsychPost(v);">생성</button></div>`;
+  list.appendChild(directItem);
   document.getElementById('psychTopicCard').style.display = 'block';
 }
 
@@ -179,6 +185,12 @@ function renderTistoryTopics(topics) {
     item.addEventListener('click', () => generateTistoryPost(title));
     list.appendChild(item);
   });
+  // 직접 입력 항목 추가
+  const directItem = document.createElement('div');
+  directItem.className = 'topic-item';
+  directItem.style.borderStyle = 'dashed';
+  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="tistoryDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" /><button class="btn-sm btn-accent" onclick="const v=document.getElementById('tistoryDirectInput').value.trim();if(v)generateTistoryPost(v);">생성</button></div>`;
+  list.appendChild(directItem);
   document.getElementById('tistoryTopicCard').style.display = 'block';
 }
 
