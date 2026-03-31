@@ -109,8 +109,18 @@ async function generatePsychPost(title) {
       `다음 주제로 위 형식과 톤앤매너에 맞게 작성해주세요: ${title}`,
       2500
     );
+       // 마크다운 기호 후처리 제거
+    const cleaned = result
+      .replace(/\*\*(.*?)\*\*/g, '$1')   // **굵게** 제거
+      .replace(/\*(.*?)\*/g, '$1')        // *기울임* 제거
+      .replace(/^#+\s*/gm, '')            // # 제목 기호 제거
+      .replace(/^-\s+/gm, '')             // - 목록 기호 제거
+      .replace(/^\d+\.\s+/gm, '')         // 1. 번호 목록 제거
+      .replace(/`(.*?)`/g, '$1')          // `코드` 제거
+      .trim();
+
     document.getElementById('psychTitleBox').textContent = title;
-    document.getElementById('psychOutput').textContent = result;
+    document.getElementById('psychOutput').textContent = cleaned;
     document.getElementById('psychImages').style.display = 'block';
     const imgList = document.getElementById('psychImageList');
     imgList.innerHTML = '<div style="color:#7a7a8c;font-size:12px">이미지 검색 중...</div>';
