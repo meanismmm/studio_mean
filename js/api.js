@@ -48,3 +48,21 @@ async function searchPexels(query, count = 5) {
     photographer: p.photographer
   }));
 }
+// JSON 안전 파싱 (Claude 응답 정제)
+function safeParseJSON(text) {
+  // 마크다운 코드블록 제거
+  let clean = text.replace(/```json|```/g, '').trim();
+  // 첫 { 또는 [ 부터 마지막 } 또는 ] 까지만 추출
+  const firstBrace = Math.min(
+    clean.indexOf('{') === -1 ? Infinity : clean.indexOf('{'),
+    clean.indexOf('[') === -1 ? Infinity : clean.indexOf('[')
+  );
+  const lastBrace = Math.max(
+    clean.lastIndexOf('}'),
+    clean.lastIndexOf(']')
+  );
+  if (firstBrace !== Infinity && lastBrace !== -1) {
+    clean = clean.slice(firstBrace, lastBrace + 1);
+  }
+  return JSON.parse(clean);
+}
