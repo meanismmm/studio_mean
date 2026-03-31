@@ -15,7 +15,7 @@ async function recommendPsychTopics() {
     const result = await callClaude(
       '당신은 정신건강의학과 블로그 주제 기획 전문가입니다.',
       `오늘 날짜: ${today} / 요청번호: ${seed}
-인천 가로수 정신건강의학과 네이버 블로그 포스팅 주제 5개를 추천해주세요.
+인천 가로수 정신건강의학과 네이버 블로그 포스팅 주제 5개 추천.
 제외 주제 (절대 포함 금지): ${allExclude.length ? allExclude.join(', ') : '없음'}
 의원급 진료 가능 질환, 네이버 검색량 있는 주제, 카테고리 다양하게, 매번 새롭게.
 반드시 번호 목록으로만:
@@ -45,11 +45,10 @@ function renderPsychTopics(topics) {
     item.addEventListener('click', () => generatePsychPost(title));
     list.appendChild(item);
   });
-  // 직접 입력 항목 추가
   const directItem = document.createElement('div');
   directItem.className = 'topic-item';
   directItem.style.borderStyle = 'dashed';
-  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="psychDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" /><button class="btn-sm btn-accent" onclick="const v=document.getElementById('psychDirectInput').value.trim();if(v)generatePsychPost(v);">생성</button></div>`;
+  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="psychDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v)generatePsychPost(v);}"/><button class="btn-sm btn-accent" onclick="const v=document.getElementById('psychDirectInput').value.trim();if(v)generatePsychPost(v);">생성</button></div>`;
   list.appendChild(directItem);
   document.getElementById('psychTopicCard').style.display = 'block';
 }
@@ -61,47 +60,40 @@ async function generatePsychPost(title) {
     const result = await callClaude(
       `당신은 인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 작가입니다.
 
-[톤앤매너 — 매우 중요]
-아래 샘플의 문체를 정확히 분석하고 따르세요.
+[톤앤매너]
+샘플: "매달 약국에서 가장 꾸준히 팔리는 약을 하나만 꼽으라고 한다면 단연 생리통 진통제가 아닐까 합니다. 많은 여성이 다가올 육체적 통증에 대비해 약을 상비하지만, 생리 시작 전 찾아오는 '감정의 통증' 앞에서는 아무런 대응도 하지 못한 채 속수무책의 상황에 빠지곤 하지요."
 
-샘플:
-"매달 약국에서 가장 꾸준히 팔리는 약을 하나만 꼽으라고 한다면 단연 생리통 진통제가 아닐까 합니다. 많은 여성이 다가올 육체적 통증에 대비해 약을 상비하지만, 생리 시작 전 찾아오는 '감정의 통증' 앞에서는 아무런 대응도 하지 못한 채 속수무책의 상황에 빠지곤 하지요."
-
-"결론부터 말씀드리면, 기업은 여러분의 정신과 진료 기록을 열람할 수 없습니다. 의료법 제21조와 개인정보보호법에 따라, 환자 본인의 동의 없는 의료 기록 열람은 법으로 엄격히 금지되어 있습니다."
-
-[핵심 문체 특징]
 - 따뜻하고 공감적인 의사 어투. ~합니다 / ~지요 / ~이지요 체
-- 환자의 감정에 먼저 공감한 뒤 의학 정보를 자연스럽게 연결
-- 소제목 없음. 구분점 없음. 번호 목록 없음. 마크다운 없음
+- 환자 감정 공감 먼저, 의학 정보 자연스럽게 연결
+- 소제목 없음. 구분점 없음. 번호 없음. 마크다운 없음. 별표 없음
 - 수필처럼 문단이 자연스럽게 이어지는 완성된 글
-- 비유와 은유를 풍부하게 활용 (예: "이슬비도 결국 비입니다")
-- 전문 용어는 쉽게 풀어서 설명
-- 매번 새로운 도입부. 유사문서 절대 금지
+- 비유와 은유 풍부하게. 전문용어는 쉽게 풀어서.
+- 매번 새로운 도입부. 유사문서 절대 금지.
 
-[문단 구성 — 반드시 이 순서와 형식]
-제목 (SEO 최적화, "인천 가로수 정신건강의학과" 포함)
+[문단 구성 - 반드시 이 순서 준수. 순수 텍스트만.]
+제목 (SEO 최적화, 인천 가로수 정신건강의학과 포함)
 
-서두: 주제를 자연스럽게 소개하는 1~2문장
+서두: 주제 소개 1~2문장
 
 (지도)
 
-1문단: 환자 공감 도입. 진료실 경험이나 일상적 상황으로 시작. (200~250자)
+1문단: 환자 공감 도입. 진료실 경험이나 일상 상황으로 시작. 200~250자
 
 (사진)
 
-2문단: 질환/증상 설명. 어렵지 않게, 비유 활용. (200~250자)
+2문단: 질환/증상 설명. 비유 활용. 200~250자
 
 (사진)
 
-3문단: 원인 또는 오해와 진실. (200~250자)
+3문단: 원인 또는 오해와 진실. 200~250자
 
 (사진)
 
-4문단: 방치 시 위험성 또는 치료 필요성. (200~250자)
+4문단: 방치 시 위험성 또는 치료 필요성. 200~250자
 
 (사진)
 
-5문단: 치료 방법과 회복 가능성. 희망적으로. (200~250자)
+5문단: 치료 방법과 회복 가능성. 희망적으로. 200~250자
 
 (사진)
 
@@ -111,20 +103,18 @@ async function generatePsychPost(title) {
 
 인천 가로수 정신건강의학과 이성철 원장
 
-총 글자 수: 1500~1800자. 순수 텍스트만. 마크다운 절대 금지.`,
+총 1500~1800자. 순수 텍스트만. 별표 샵 대시 등 마크다운 기호 절대 사용 금지.`,
       `다음 주제로 위 형식과 톤앤매너에 맞게 작성해주세요: ${title}`,
       2500
     );
-       // 마크다운 기호 후처리 제거
     const cleaned = result
-      .replace(/\*\*(.*?)\*\*/g, '$1')   // **굵게** 제거
-      .replace(/\*(.*?)\*/g, '$1')        // *기울임* 제거
-      .replace(/^#+\s*/gm, '')            // # 제목 기호 제거
-      .replace(/^-\s+/gm, '')             // - 목록 기호 제거
-      .replace(/^\d+\.\s+/gm, '')         // 1. 번호 목록 제거
-      .replace(/`(.*?)`/g, '$1')          // `코드` 제거
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/^#+\s*/gm, '')
+      .replace(/^-\s+/gm, '')
+      .replace(/^\d+\.\s+/gm, '')
+      .replace(/`(.*?)`/g, '$1')
       .trim();
-
     document.getElementById('psychTitleBox').textContent = title;
     document.getElementById('psychOutput').textContent = cleaned;
     document.getElementById('psychImages').style.display = 'block';
@@ -185,11 +175,10 @@ function renderTistoryTopics(topics) {
     item.addEventListener('click', () => generateTistoryPost(title));
     list.appendChild(item);
   });
-  // 직접 입력 항목 추가
   const directItem = document.createElement('div');
   directItem.className = 'topic-item';
   directItem.style.borderStyle = 'dashed';
-  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="tistoryDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" /><button class="btn-sm btn-accent" onclick="const v=document.getElementById('tistoryDirectInput').value.trim();if(v)generateTistoryPost(v);">생성</button></div>`;
+  directItem.innerHTML = `<div class="topic-num">✏️</div><div style="display:flex;gap:8px;align-items:center;width:100%"><input type="text" id="tistoryDirectInput" placeholder="주제 직접 입력..." style="flex:1;background:#0d0d0f;border:1px solid #3a3a45;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v)generateTistoryPost(v);}"/><button class="btn-sm btn-accent" onclick="const v=document.getElementById('tistoryDirectInput').value.trim();if(v)generateTistoryPost(v);">생성</button></div>`;
   list.appendChild(directItem);
   document.getElementById('tistoryTopicCard').style.display = 'block';
 }
@@ -201,31 +190,23 @@ async function generateTistoryPost(title) {
     const result = await callClaude(
       `당신은 티스토리 개인 블로그 작가입니다.
 
-[톤앤매너 — 매우 중요]
-아래 샘플의 문체를 정확히 분석하고 따르세요.
+[톤앤매너]
+샘플1: "분명하게 말하지만, 이 글은 나태하게 살라는 말을 하려는 것은 아니다. 갓생이든 뭐든 무언가에 몰입하고 어제보다 나은 상태를 지향하는 행동은 인간을 인간답게 만드는 훌륭한 동력이고 분명 사람을 더 발전하게 만들지도 모른, 아니, 발전하게 만든다."
+샘플2: "인생은 엑셀 시트가 아니다. 독서의 가치는 읽은 페이지 수가 아니라 그 안의 문장이 내 삶에 어떤 균열을 냈느냐에 있다."
+샘플3: "나는 주택에 산다. 수도관이 얼어 버려서 집에 물이 안나온다. 아, 이제 짜증이 난다."
 
-샘플1:
-"분명하게 말하지만, 이 글은 나태하게 살라는 말을 하려는 것은 아니다. 갓생이든 뭐든 무언가에 몰입하고 어제보다 나은 상태를 지향하는 행동은 인간을 인간답게 만드는 훌륭한 동력이고 분명 사람을 더 발전하게 만들지도 모른, 아니, 발전하게 만든다."
-
-샘플2:
-"갓생이라는 단어가 유행할 무렵부터 우리는 우리도 모르는 사이 삶의 모든 순간을 '숫자'로 치환하려는 강박을 느끼게 되지 않았나 생각이 든다. 인생은 엑셀 시트가 아니다. 독서의 가치는 읽은 페이지 수가 아니라 그 안의 문장이 내 삶에 어떤 균열을 냈느냐에 있고, 운동의 가치는 소모한 칼로리가 아니라 내 몸이 느끼는 활력에 있다."
-
-샘플3:
-"나는 주택에 산다. 겨울이면, 아파트나 빌라, 원룸이 아닌 일반 개인주택-국민주택들은 수도관이 어는 경우가 왕왕 있는데 지난주 역대급 한파에 수도관이 얼어 버려서 집에 물이 안나온다. 아, 이제 짜증이 난다."
-
-[핵심 문체 특징]
 - 1인칭. 자기 생각을 직설적으로 밀어붙임
 - 시니컬하되 히스테릭하지 않음. 냉소적이지만 설득력 있음
-- 구어체이되 문장력이 있음. 비유가 구체적이고 날카로움
+- 구어체이되 문장력 있음. 비유가 구체적이고 날카로움
 - 웃기려는 게 아니라 그냥 솔직한 것. 억지 유머 금지
 - 마무리는 짧게 끊음. "끝이다." 스타일
 
 [형식]
-- 소제목은 ## 형식으로
+- 소제목은 ## 형식
 - 사진 위치는 (사진) 표시
 - 총 1000자 내외
-- 마크다운 소제목(##) 외 다른 마크다운 금지`,
-      `다음 주제로 위 톤앤매너에 맞게 티스토리 블로그 글을 작성해주세요: ${title}`,
+- ## 소제목 외 마크다운 기호 일절 금지`,
+      `다음 주제로 위 톤앤매너에 맞게 작성해주세요: ${title}`,
       2000
     );
     document.getElementById('tistoryTitleBox').textContent = title;
