@@ -33,6 +33,7 @@ jobs:
               f.write(data)
           quiz = json.loads(data)
           print('Hook:', quiz.get('hookTitle',''))
+          print('Question:', quiz.get('question','')[:40])
           "
 
       - name: Generate TTS
@@ -63,6 +64,7 @@ jobs:
               print(f"TTS: {len(data)} bytes")
           else:
               open('narration.mp3','wb').close()
+              print(f"TTS failed: {resp.status_code}")
           EOF
 
       - name: Generate BGM
@@ -79,18 +81,18 @@ jobs:
           if [ "$MOOD" = "bright" ]; then
             EXPR="0.05*sin(2*PI*261*t)+0.04*sin(2*PI*329*t)+0.03*sin(2*PI*392*t)"
           else
-            EXPR="0.06*sin(2*PI*55*t)+0.04*sin(2*PI*82*t)+0.02*sin(2*PI*110*t)+0.015*sin(2*PI*146*t)"
+            EXPR="0.06*sin(2*PI*55*t)+0.04*sin(2*PI*82*t)+0.02*sin(2*PI*110*t)"
           fi
           ffmpeg -f lavfi -i "aevalsrc=${EXPR}:s=44100" \
-            -af "afade=t=in:st=0:d=2,afade=t=out:st=35:d=2" \
-            -t 37 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
+            -af "afade=t=in:st=0:d=1,afade=t=out:st=28:d=2" \
+            -t 30 -c:a libmp3lame -b:a 128k bgm.mp3 -y -loglevel error
           echo "BGM: $(du -h bgm.mp3)"
 
-      - name: Render frames
+      - name: Render base frames
         run: |
           python3 << 'EOF'
           import json, os
-          from PIL import Image, ImageDraw, ImageFont, ImageFilter
+          from PIL import Image, ImageDraw, ImageFont
 
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
@@ -98,15 +100,24 @@ jobs:
           W, H = 1080, 1920
           os.makedirs('frames', exist_ok=True)
 
-          BG      = (10, 10, 13)
-          ACCENT  = (91, 127, 255)
-          GOLD    = (255, 209, 102)
-          GREEN   = (78, 205, 196)
-          RED     = (255, 90, 90)
-          WHITE   = (245, 245, 252)
-          LGRAY   = (190, 190, 205)
-          MGRAY   = (110, 110, 125)
-          DGRAY   = (28, 28, 36)
+          # 고정 컬러
+          DARK_BG  = (18, 18, 22)
+          WHITE_BG = (252, 252, 252)
+          DARK_FG  = (22, 22, 28)
+          BLACK    = (20, 20, 24)
+          ACCENT   = (40, 40, 48)
+          TEXT_DK  = (240, 240, 248)
+          TEXT_LT  = (30, 30, 36)
+          TEXT_GR  = (140, 140, 155)
+          DOT_OFF  = (210, 210, 218)
+          DOT_ON   = (30, 30, 38)
+
+          # 레이아웃 고정값
+          HEADER_H  = 520    # 헤더 높이
+          BODY_Y    = 520    # 본문 시작
+          BODY_H    = 1100   # 본문 높이
+          FOOTER_Y  = 1620   # 푸터 시작
+          FOOTER_H  = 300    # 푸터 높이
 
           def fnt(size):
               for p in [
@@ -119,380 +130,200 @@ jobs:
                       except: pass
               return ImageFont.load_default()
 
-          def text_w(d, text, font):
-              bb = d.textbbox((0,0), text, font=font)
+          def tw(d, t, f):
+              bb = d.textbbox((0,0),t,font=f)
               return bb[2]-bb[0]
 
-          def text_h(d, text, font):
-              bb = d.textbbox((0,0), text, font=font)
+          def th(d, t, f):
+              bb = d.textbbox((0,0),t,font=f)
               return bb[3]-bb[1]
 
-          def auto_font_size(d, text, max_w, max_size=120, min_size=40):
-              """텍스트가 한 줄에 들어가는 최대 폰트 크기 반환"""
-              for size in range(max_size, min_size-1, -2):
-                  f = fnt(size)
-                  if text_w(d, text, f) <= max_w:
-                      return f, size
-              return fnt(min_size), min_size
-
-          def smart_split(text, max_chars=12):
-              """한국어 텍스트를 의미 단위로 분할 (max_chars 기준)"""
-              if len(text) <= max_chars:
-                  return [text]
-              # 공백 기준으로 먼저 분할 시도
+          def cx(d, text, y, font, color, max_w=960, lsp=12):
+              """중앙정렬 + 자동줄바꿈"""
               words = text.split()
-              if len(words) >= 2:
-                  lines = []
-                  cur = ''
-                  for w in words:
-                      test = (cur + ' ' + w).strip()
-                      if len(test) > max_chars and cur:
-                          lines.append(cur)
-                          cur = w
-                      else:
-                          cur = test
-                  if cur: lines.append(cur)
-                  return lines
-              # 공백 없으면 글자수로 분할
-              mid = len(text) // 2
-              return [text[:mid], text[mid:]]
-
-          def draw_text_glow(img, text, x, y, font, color, glow_color, glow_radius=3):
-              """텍스트에 글로우 효과 추가"""
-              # 글로우 레이어
-              glow_layer = Image.new('RGBA', img.size, (0,0,0,0))
-              gd = ImageDraw.Draw(glow_layer)
-              for ox in range(-glow_radius, glow_radius+1):
-                  for oy in range(-glow_radius, glow_radius+1):
-                      if ox != 0 or oy != 0:
-                          gd.text((x+ox, y+oy), text, font=font,
-                                  fill=(*glow_color, 60))
-              blurred = glow_layer.filter(ImageFilter.GaussianBlur(glow_radius))
-              img_rgba = img.convert('RGBA')
-              img_rgba = Image.alpha_composite(img_rgba, blurred)
-              # 메인 텍스트
-              d = ImageDraw.Draw(img_rgba)
-              d.text((x, y), text, font=font, fill=color)
-              return img_rgba.convert('RGB')
-
-          def cx_auto(img, text, y, max_w, color, glow_color=None,
-                      max_size=120, min_size=36, lsp=20):
-              """자동 폰트 크기 + 중앙 정렬 + 글로우"""
-              d_tmp = ImageDraw.Draw(img)
-              lines = smart_split(text, max_chars=14)
-
-              # 전체 텍스트가 한 줄에 들어가면 한 줄로
-              f_single, _ = auto_font_size(d_tmp, text, max_w, max_size, min_size)
-              if text_w(d_tmp, text, f_single) <= max_w and len(lines) > 1:
-                  lines = [text]
-
-              # 각 줄 최적 폰트 (가장 긴 줄 기준)
-              longest = max(lines, key=len)
-              f, sz = auto_font_size(d_tmp, longest, max_w, max_size, min_size)
-
-              cur_y = y
+              lines, cur = [], ''
+              for w in words:
+                  t2 = (cur+' '+w).strip()
+                  if tw(d, t2, font) > max_w and cur:
+                      lines.append(cur); cur = w
+                  else: cur = t2
+              if cur: lines.append(cur)
+              # 단어 분할이 안되면 글자수 반반
+              if len(lines) == 1 and tw(d, lines[0], font) > max_w:
+                  t = lines[0]
+                  mid = len(t)//2
+                  lines = [t[:mid], t[mid:]]
               for line in lines:
-                  ww = text_w(d_tmp, line, f)
-                  hh = text_h(d_tmp, line, f)
-                  tx = (W - ww) // 2
-                  if glow_color:
-                      img = draw_text_glow(img, line, tx, cur_y, f, color, glow_color)
-                  else:
-                      d = ImageDraw.Draw(img)
-                      d.text((tx, cur_y), line, font=f, fill=color)
-                  cur_y += hh + lsp
-              return img, cur_y
+                  ww = tw(d, line, font)
+                  d.text(((W-ww)//2, y), line, font=font, fill=color)
+                  y += th(d, line, font) + lsp
+              return y
 
-          def make_gradient_bg(color1=BG, color2=(18,18,28)):
-              """세로 그라데이션 배경"""
-              img = Image.new('RGB', (W, H), color1)
-              d = ImageDraw.Draw(img)
-              for y in range(H):
-                  t = y / H
-                  r = int(color1[0] + (color2[0]-color1[0]) * t)
-                  g = int(color1[1] + (color2[1]-color1[1]) * t)
-                  b = int(color1[2] + (color2[2]-color1[2]) * t)
-                  d.rectangle([0, y, W, y+1], fill=(r,g,b))
-              return img
-
-          def hline(d, y, color, thickness=3, margin=60):
-              d.rectangle([margin, y, W-margin, y+thickness], fill=color)
-
-          def accent_bar(d, color, top=True):
-              if top:
-                  for i in range(12):
-                      alpha = int(255 * (1 - i/12))
-                      c = tuple(int(color[j] * alpha/255 + BG[j] * (1-alpha/255)) for j in range(3))
-                      d.rectangle([0, i, W, i+1], fill=c)
-                  d.rectangle([0, 0, W, 8], fill=color)
-              else:
-                  for i in range(12):
-                      alpha = int(255 * (1 - i/12))
-                      c = tuple(int(color[j] * alpha/255 + BG[j] * (1-alpha/255)) for j in range(3))
-                      d.rectangle([0, H-i-1, W, H-i], fill=c)
-                  d.rectangle([0, H-8, W, H], fill=color)
+          def fit_font(d, text, max_w, sizes):
+              """텍스트가 max_w 안에 들어오는 첫 폰트 반환"""
+              for s in sizes:
+                  f = fnt(s)
+                  if tw(d, text, f) <= max_w:
+                      return f
+              return fnt(sizes[-1])
 
           hook = quiz.get('hookTitle', '오늘의 퀴즈')
           q    = quiz.get('question', '')
           ans  = quiz.get('answer', '')
           exp  = quiz.get('explanation', '')
           opts = quiz.get('options', [])
-          diff = quiz.get('difficulty', 'normal')
-          dc   = {'easy': GREEN, 'normal': GOLD, 'hard': RED}.get(diff, GOLD)
-          dl   = {'easy': 'EASY', 'normal': 'NORMAL', 'hard': 'HARD'}.get(diff, 'NORMAL')
 
-          # ══════════════════════════════════════
-          # F1: 오프닝
-          # ══════════════════════════════════════
-          img = make_gradient_bg(BG, (15, 15, 25))
-          d = ImageDraw.Draw(img)
-          accent_bar(d, ACCENT, top=True)
-          accent_bar(d, ACCENT, top=False)
-
-          # 상단 태그
-          f_tag = fnt(40)
-          tag_w = text_w(d, '매일 퀴즈 도전', f_tag)
-          d.text(((W-tag_w)//2, 620), '매일 퀴즈 도전', font=f_tag, fill=MGRAY)
-          hline(d, 680, DGRAY, thickness=2, margin=120)
-
-          # 메인 훅 — 자동 폰트 + 글로우
-          img, y = cx_auto(img, hook, 730, 920,
-                           WHITE, glow_color=ACCENT,
-                           max_size=110, min_size=52, lsp=22)
-
-          # 난이도 뱃지
-          y += 24
-          f_dl = fnt(42)
-          btext = f'[ {dl} ]'
-          bw = text_w(d, btext, f_dl) + 52
-          bh = 64
-          bx = (W - bw) // 2
-          d = ImageDraw.Draw(img)
-          d.rounded_rectangle([bx, y, bx+bw, y+bh], radius=10, fill=dc)
-          d.text((bx+26, y+12), btext, font=f_dl, fill=BG)
-
-          # 하단
-          f_sub = fnt(38)
-          sub_w = text_w(d, '지금 바로 도전하세요', f_sub)
-          d.text(((W-sub_w)//2, H-140), '지금 바로 도전하세요', font=f_sub, fill=MGRAY)
-
-          img.save('frames/f1.png')
-          print("f1 done")
-
-          # ══════════════════════════════════════
-          # F2: 문제
-          # ══════════════════════════════════════
-          img = make_gradient_bg(BG, (12, 12, 22))
-          d = ImageDraw.Draw(img)
-          accent_bar(d, ACCENT, top=True)
-          accent_bar(d, ACCENT, top=False)
-
-          # QUESTION 라벨
-          f_ql = fnt(36)
-          ql_w = text_w(d, 'Q U E S T I O N', f_ql)
-          d.text(((W-ql_w)//2, 60), 'Q U E S T I O N', font=f_ql, fill=ACCENT)
-          hline(d, 112, ACCENT, thickness=2, margin=80)
-
-          # 문제 텍스트 — 수직 중앙 배치
-          # 먼저 줄 수 계산
-          d_tmp = ImageDraw.Draw(img)
-          q_lines = smart_split(q, max_chars=16)
-          longest_q = max(q_lines, key=len)
-          # 전체가 한 줄 가능하면 한 줄로
-          f_q_single, _ = auto_font_size(d_tmp, q, 960, 90, 44)
-          if text_w(d_tmp, q, f_q_single) <= 960:
-              q_lines = [q]
-          f_q, _ = auto_font_size(d_tmp, max(q_lines, key=len), 960, 90, 44)
-          q_line_h = text_h(d_tmp, q_lines[0], f_q) + 20
-          q_total_h = len(q_lines) * q_line_h
-
-          # 선택지 높이 계산
-          opt_total_h = len(opts[:4]) * 96 if opts else 0
-
-          # 전체 콘텐츠를 수직 중앙에
-          content_h = q_total_h + (60 if opts else 0) + opt_total_h
-          start_y = max(160, (H - content_h) // 2 - 40)
-
-          # 문제 그리기
-          cur_y = start_y
-          for line in q_lines:
-              ww = text_w(d, line, f_q)
-              hh = text_h(d, line, f_q)
-              tx = (W - ww) // 2
-              img = draw_text_glow(img, line, tx, cur_y, f_q, WHITE, ACCENT, glow_radius=2)
-              d = ImageDraw.Draw(img)
-              cur_y += hh + 20
-
-          # 선택지
-          if opts:
-              cur_y += 48
-              f_opt_lbl = fnt(46)
-              f_opt_txt = fnt(44)
-              for i, opt in enumerate(opts[:4]):
-                  lbl = ['A', 'B', 'C', 'D'][i]
-                  # 박스
-                  d.rounded_rectangle([70, cur_y, W-70, cur_y+82], radius=14, fill=DGRAY)
-                  # 좌측 컬러 바
-                  d.rounded_rectangle([70, cur_y, 110, cur_y+82], radius=8, fill=ACCENT)
-                  # 라벨
-                  lbl_w = text_w(d, lbl, f_opt_lbl)
-                  d.text((90 - lbl_w//2, cur_y+18), lbl, font=f_opt_lbl, fill=WHITE)
-                  # 텍스트
-                  d.text((128, cur_y+19), opt, font=f_opt_txt, fill=LGRAY)
-                  cur_y += 96
-
-          # 하단 힌트
-          f_hint = fnt(34)
-          hint_w = text_w(d, '잘 생각해보세요...', f_hint)
-          d.text(((W-hint_w)//2, H-72), '잘 생각해보세요...', font=f_hint, fill=MGRAY)
-
-          img.save('frames/f2.png')
-          print("f2 done")
-
-          # ══════════════════════════════════════
-          # F3: 카운트다운 (숫자 풀스크린 + 글로우)
-          # ══════════════════════════════════════
-          for num in [5, 4, 3, 2, 1]:
-              img = make_gradient_bg(BG, (20, 16, 8))
-              d = ImageDraw.Draw(img)
-              accent_bar(d, GOLD, top=True)
-              accent_bar(d, GOLD, top=False)
-
-              # 상단
-              f_top = fnt(44)
-              top_w = text_w(d, '정답 공개까지...', f_top)
-              d.text(((W-top_w)//2, 160), '정답 공개까지...', font=f_top, fill=MGRAY)
-
-              # 거대한 숫자 — 화면 세로 중앙
-              f_n = fnt(560)
-              n_str = str(num)
-              nw = text_w(d, n_str, f_n)
-              nh = text_h(d, n_str, f_n)
-              nx = (W - nw) // 2
-              ny = (H - nh) // 2 - 60
-              img = draw_text_glow(img, n_str, nx, ny, f_n, GOLD, GOLD, glow_radius=8)
+          def make_frame(dot_filled=0, show_answer=False):
+              """
+              dot_filled: 0~10 (채워진 도트 수)
+              show_answer: True면 정답/해설 표시
+              """
+              img = Image.new('RGB', (W, H), DARK_BG)
               d = ImageDraw.Draw(img)
 
-              # 하단
-              f_bot = fnt(40)
-              bot_w = text_w(d, '정답을 생각해보셨나요?', f_bot)
-              d.text(((W-bot_w)//2, H-120), '정답을 생각해보셨나요?', font=f_bot, fill=MGRAY)
+              # ── 헤더 (다크) ──
+              # 상단 태그라인
+              f_tag = fnt(40)
+              tag = '매일 30초 퀴즈!'
+              d.text(((W - tw(d,tag,f_tag))//2, 60), tag, font=f_tag, fill=TEXT_GR)
 
-              img.save(f'frames/f3_{num}.png')
-          print("f3 done")
+              # 구분선
+              d.rectangle([60, 124, W-60, 127], fill=(45,45,55))
 
-          # ══════════════════════════════════════
-          # F4: 정답
-          # ══════════════════════════════════════
-          img = make_gradient_bg(BG, (8, 20, 18))
-          d = ImageDraw.Draw(img)
-          accent_bar(d, GREEN, top=True)
-          accent_bar(d, GREEN, top=False)
+              # 훅 타이틀 (문제 제목)
+              f_hook = fit_font(d, hook, 940, [80,70,60,52,44])
+              cy = 160
+              cy = cx(d, hook, cy, f_hook, TEXT_DK, max_w=940, lsp=16)
 
-          # ANSWER 라벨
-          f_al = fnt(36)
-          al_w = text_w(d, 'A N S W E R', f_al)
-          d.text(((W-al_w)//2, 60), 'A N S W E R', font=f_al, fill=GREEN)
-          hline(d, 112, GREEN, thickness=2, margin=80)
+              # ── 본문 (흰 배경) ──
+              d.rectangle([0, BODY_Y, W, BODY_Y+BODY_H], fill=WHITE_BG)
 
-          # 정답 — 자동 폰트 + 글로우
-          img, y = cx_auto(img, ans, 180, 940,
-                           GREEN, glow_color=GREEN,
-                           max_size=110, min_size=52, lsp=18)
+              if not show_answer:
+                  # 문제 텍스트
+                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=DARK_FG)
+                  f_q = fit_font(d, q, 920, [64,56,50,44,38])
+                  qy = BODY_Y + 60
+                  qy = cx(d, q, qy, f_q, TEXT_LT, max_w=920, lsp=18)
 
-          # 구분선
-          y += 40
-          d = ImageDraw.Draw(img)
-          hline(d, y, DGRAY, margin=80)
-          y += 36
+                  # 선택지
+                  if opts:
+                      qy += 40
+                      f_opt = fnt(46)
+                      lbls = ['A', 'B', 'C', 'D']
+                      for i, opt in enumerate(opts[:4]):
+                          if qy + 80 > BODY_Y + BODY_H - 20:
+                              break
+                          # 배경
+                          d.rounded_rectangle([60, qy, W-60, qy+74], radius=10,
+                                              fill=(240,240,246))
+                          # 라벨 원
+                          d.ellipse([68, qy+10, 68+54, qy+64], fill=DARK_FG)
+                          lbl_f = fnt(38)
+                          lw = tw(d, lbls[i], lbl_f)
+                          d.text((68+27-lw//2, qy+18), lbls[i], font=lbl_f, fill=WHITE_BG)
+                          # 텍스트
+                          d.text((140, qy+18), opt, font=fnt(44), fill=TEXT_LT)
+                          qy += 88
 
-          # 해설 라벨
-          f_exp_l = fnt(34)
-          el_w = text_w(d, '해  설', f_exp_l)
-          d.text(((W-el_w)//2, y), '해  설', font=f_exp_l, fill=MGRAY)
-          y += 52
-          hline(d, y, DGRAY, thickness=1, margin=120)
-          y += 28
+              else:
+                  # 정답 표시
+                  d.rectangle([0, BODY_Y, W, BODY_Y+6], fill=(40,180,160))
 
-          # 해설 텍스트 — 자동 폰트
-          img, _ = cx_auto(img, exp, y, 920,
-                           LGRAY, glow_color=None,
-                           max_size=52, min_size=34, lsp=14)
+                  d.rectangle([60, BODY_Y+40, W-60, BODY_Y+50+6], fill=(220,220,228))
+                  f_albl = fnt(36)
+                  albl_w = tw(d, '정  답', f_albl)
+                  d.text(((W-albl_w)//2, BODY_Y+30), '정  답', font=f_albl, fill=(130,130,145))
 
-          img.save('frames/f4.png')
-          print("f4 done")
+                  f_ans = fit_font(d, ans, 920, [90,80,70,60,50])
+                  ay = BODY_Y + 110
+                  ay = cx(d, ans, ay, f_ans, (30,180,160), max_w=920, lsp=16)
 
-          # ══════════════════════════════════════
-          # F5: CTA
-          # ══════════════════════════════════════
-          img = make_gradient_bg(BG, (12, 12, 22))
-          d = ImageDraw.Draw(img)
-          accent_bar(d, ACCENT, top=True)
-          accent_bar(d, ACCENT, top=False)
+                  ay += 30
+                  d.rectangle([80, ay, W-80, ay+3], fill=(210,210,218))
+                  ay += 24
 
-          img, y = cx_auto(img, '재미있었나요?', 520,
-                           900, WHITE, glow_color=ACCENT,
-                           max_size=90, min_size=60)
-          d = ImageDraw.Draw(img)
+                  f_elbl = fnt(34)
+                  elbl_w = tw(d, '해  설', f_elbl)
+                  d.text(((W-elbl_w)//2, ay), '해  설', font=f_elbl, fill=(150,150,165))
+                  ay += 52
+                  d.rectangle([100, ay, W-100, ay+2], fill=(220,220,228))
+                  ay += 20
 
-          f_c2 = fnt(50)
-          c2_w = text_w(d, '매일 새로운 퀴즈 업로드', f_c2)
-          d.text(((W-c2_w)//2, y+10), '매일 새로운 퀴즈 업로드', font=f_c2, fill=GOLD)
+                  f_exp = fit_font(d, exp, 900, [50,44,38,34])
+                  cx(d, exp, ay, f_exp, TEXT_LT, max_w=900, lsp=14)
 
-          btn_y = y + 100
-          d.rounded_rectangle([100, btn_y, W-100, btn_y+108], radius=20, fill=ACCENT)
-          f_btn = fnt(60)
-          btn_text = '좋아요  +  구독'
-          btn_w = text_w(d, btn_text, f_btn)
-          d.text(((W-btn_w)//2, btn_y+22), btn_text, font=f_btn, fill=WHITE)
+              # ── 도트 카운터 ──
+              DOT_N    = 10
+              DOT_R    = 22
+              DOT_GAP  = 18
+              total_w  = DOT_N * (DOT_R*2) + (DOT_N-1) * DOT_GAP
+              dot_x0   = (W - total_w) // 2
+              dot_y    = FOOTER_Y + 36
 
-          f_c3 = fnt(42)
-          c3_w = text_w(d, '댓글로 정답 맞춰보세요', f_c3)
-          d.text(((W-c3_w)//2, btn_y+140), '댓글로 정답 맞춰보세요', font=f_c3, fill=MGRAY)
+              for i in range(DOT_N):
+                  cx_dot = dot_x0 + i*(DOT_R*2+DOT_GAP) + DOT_R
+                  color = DOT_ON if i < dot_filled else DOT_OFF
+                  d.ellipse([cx_dot-DOT_R, dot_y, cx_dot+DOT_R, dot_y+DOT_R*2], fill=color)
 
-          img.save('frames/f5.png')
-          print("f5 done")
-          print("All frames done!")
+              # ── 푸터 텍스트 ──
+              f_footer = fnt(38)
+              if not show_answer:
+                  ft = '기다리면 정답이 나와요!'
+              else:
+                  ft = '팔로우하고 매일 퀴즈 받아보세요'
+              ft_w = tw(d, ft, f_footer)
+              d.text(((W-ft_w)//2, FOOTER_Y+110), ft, font=f_footer, fill=TEXT_GR)
+
+              return img
+
+          # 도트 0 ~ 10 프레임 생성 (각 1초)
+          for i in range(11):
+              frame = make_frame(dot_filled=i, show_answer=False)
+              frame.save(f'frames/q_{i:02d}.png')
+          print("Question frames done (0~10)")
+
+          # 정답 프레임
+          ans_frame = make_frame(dot_filled=10, show_answer=True)
+          ans_frame.save('frames/answer.png')
+          print("Answer frame done")
           EOF
 
       - name: Compose video
         run: |
           set -e
-          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS OK"
-          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM OK"
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS OK: $(du -h narration.mp3)"
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM OK: $(du -h bgm.mp3)"
 
           VF="scale=1080:1920:force_original_aspect_ratio=disable,setsar=1,fps=30"
 
-          ffmpeg -loop 1 -i frames/f1.png -t 3 \
-            -vf "${VF},fade=t=in:st=0:d=0.4" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s1.mp4 -y -loglevel error
-
-          ffmpeg -loop 1 -i frames/f2.png -t 15 \
-            -vf "${VF},drawbox=x=0:y=1900:w='iw*t/15':h=20:color=5b7fff@1.0:t=fill" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s2.mp4 -y -loglevel error
-
-          for num in 5 4 3 2 1; do
-            ffmpeg -loop 1 -i frames/f3_${num}.png -t 1 \
-              -vf "${VF},fade=t=in:st=0:d=0.12" \
+          # 도트 0~10 각 1초 영상
+          for i in $(seq 0 10); do
+            fi=$(printf "%02d" $i)
+            ffmpeg -loop 1 -i frames/q_${fi}.png -t 1 \
+              -vf "${VF}" \
               -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
-              cd${num}.mp4 -y -loglevel error
+              dot${fi}.mp4 -y -loglevel error
           done
-          printf "file 'cd5.mp4'\nfile 'cd4.mp4'\nfile 'cd3.mp4'\nfile 'cd2.mp4'\nfile 'cd1.mp4'\n" > cdlist.txt
-          ffmpeg -f concat -safe 0 -i cdlist.txt -c copy s3.mp4 -y -loglevel error
 
-          ffmpeg -loop 1 -i frames/f4.png -t 10 \
-            -vf "${VF},fade=t=in:st=0:d=0.5" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s4.mp4 -y -loglevel error
+          # 정답 10초
+          ffmpeg -loop 1 -i frames/answer.png -t 10 \
+            -vf "${VF},fade=t=in:st=0:d=0.4" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 \
+            ans.mp4 -y -loglevel error
 
-          ffmpeg -loop 1 -i frames/f5.png -t 4 \
-            -vf "${VF},fade=t=in:st=0:d=0.3" \
-            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 16 s5.mp4 -y -loglevel error
+          # concat 파일 생성
+          > cl.txt
+          for i in $(seq 0 10); do
+            fi=$(printf "%02d" $i)
+            echo "file 'dot${fi}.mp4'" >> cl.txt
+          done
+          echo "file 'ans.mp4'" >> cl.txt
 
-          printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
           ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel error
           DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
           echo "Duration: ${DUR}s"
 
+          # 오디오 믹싱
           if $has_tts && $has_bgm; then
             ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
               -filter_complex \
@@ -513,6 +344,7 @@ jobs:
             cp merged.mp4 quiz_video.mp4
           fi
 
+          echo "=== Final ==="
           ls -lh quiz_video.mp4
           ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
