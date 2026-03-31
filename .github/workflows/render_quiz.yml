@@ -16,7 +16,7 @@ jobs:
       - name: Install FFmpeg & fonts
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg fonts-noto-cjk imagemagick
+          sudo apt-get install -y ffmpeg fonts-noto-cjk imagemagick wget
           fc-cache -fv
 
       - name: Set up Python
@@ -28,228 +28,263 @@ jobs:
         run: pip install requests pillow
 
       - name: Prepare quiz data
-        env:
-          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
         run: |
-          echo "$QUIZ_DATA" > quiz_data.json
-          echo "Quiz data saved:"
+          echo '${{ toJson(github.event.client_payload.quiz) }}' > quiz_data.json
           cat quiz_data.json
 
       - name: Generate TTS narration
         env:
           GCP_TTS_KEY: ${{ secrets.GCP_TTS_KEY }}
-          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
         run: |
           python3 << 'EOF'
           import json, requests, base64, os
-
-          with open('quiz_data.json', 'r') as f:
+          with open('quiz_data.json', 'r', encoding='utf-8') as f:
               quiz = json.load(f)
-
           tts_key = os.environ.get('GCP_TTS_KEY', '')
           narration = quiz.get('narration', {})
-          full_text = (
-              narration.get('intro', '') + ' ' +
-              narration.get('question', '') + ' ' +
-              narration.get('countdown', '') + ' ' +
-              narration.get('answer', '') + ' ' +
-              narration.get('outro', '')
-          )
-
-          if tts_key:
+          full = ' '.join([narration.get(k,'') for k in ['intro','question','countdown','answer','outro']])
+          if tts_key and full.strip():
               resp = requests.post(
                   f'https://texttospeech.googleapis.com/v1/text:synthesize?key={tts_key}',
                   json={
-                      'input': {'text': full_text},
-                      'voice': {'languageCode': 'ko-KR', 'name': 'ko-KR-Wavenet-C', 'ssmlGender': 'FEMALE'},
-                      'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 1.05}
+                      'input': {'text': full},
+                      'voice': {'languageCode':'ko-KR','name':'ko-KR-Wavenet-C','ssmlGender':'FEMALE'},
+                      'audioConfig': {'audioEncoding':'MP3','speakingRate':1.05}
                   }
               )
-              if resp.ok:
-                  audio_b64 = resp.json().get('audioContent', '')
-                  with open('narration.mp3', 'wb') as f:
-                      f.write(base64.b64decode(audio_b64))
-                  print("TTS generated successfully")
+              if resp.ok and resp.json().get('audioContent'):
+                  with open('narration.mp3','wb') as f:
+                      f.write(base64.b64decode(resp.json()['audioContent']))
+                  print("TTS OK:", os.path.getsize('narration.mp3'), "bytes")
               else:
-                  print(f"TTS failed: {resp.status_code}")
+                  print("TTS fail:", resp.status_code)
+                  open('narration.mp3','wb').close()
           else:
-              # TTS 키 없으면 무음 mp3 생성
-              open('narration.mp3', 'wb').close()
-              print("No TTS key, using silence")
+              open('narration.mp3','wb').close()
+              print("No TTS key or text")
           EOF
 
-      - name: Render quiz video frames
-        env:
-          QUIZ_DATA: ${{ toJson(github.event.client_payload.quiz) }}
+      - name: Download background music
         run: |
           python3 << 'EOF'
-          import json, subprocess, os
+          import json, requests, os
+          with open('quiz_data.json','r',encoding='utf-8') as f:
+              quiz = json.load(f)
+          hook = quiz.get('hookTitle','')
+          bright_kw = ['심리','상식','넌센스','쉬움','easy']
+          mood = 'bright' if any(k in hook for k in bright_kw) else 'mystery'
+          urls = {
+              'mystery': ['https://freepd.com/music/Investigations.mp3','https://freepd.com/music/Sneaky%20Snitch.mp3'],
+              'bright':  ['https://freepd.com/music/Funky%20Chunk.mp3','https://freepd.com/music/Happy%20Boy%20Theme.mp3']
+          }
+          for url in urls[mood]:
+              try:
+                  r = requests.get(url, timeout=15, headers={'User-Agent':'Mozilla/5.0'})
+                  if r.ok and len(r.content) > 5000:
+                      open('bgm.mp3','wb').write(r.content)
+                      print(f"BGM OK: {url} {len(r.content)}bytes mood={mood}")
+                      break
+              except Exception as e:
+                  print(f"BGM fail: {e}")
+          else:
+              open('bgm.mp3','wb').close()
+              print("No BGM")
+          EOF
+
+      - name: Render frames
+        run: |
+          python3 << 'EOF'
+          import json, os
           from PIL import Image, ImageDraw, ImageFont
 
-          with open('quiz_data.json', 'r') as f:
+          with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
 
           W, H = 1080, 1920
-          BG_DARK = (13, 13, 15)
-          BG_CARD = (28, 28, 33)
-          ACCENT = (91, 127, 255)
-          ACCENT_GOLD = (255, 209, 102)
-          GREEN = (78, 205, 196)
-          WHITE = (232, 232, 240)
-          GRAY = (122, 122, 140)
-
-          def make_frame(bg_color, elements, filename):
-              img = Image.new('RGB', (W, H), bg_color)
-              draw = ImageDraw.Draw(img)
-
-              # 상단 장식선
-              draw.rectangle([0, 0, W, 6], fill=ACCENT)
-
-              for el in elements:
-                  el_type = el.get('type')
-                  x = el.get('x', W//2)
-                  y = el.get('y', H//2)
-                  text = str(el.get('text', ''))
-                  color = el.get('color', WHITE)
-                  size = el.get('size', 48)
-                  align = el.get('align', 'center')
-
-                  # 폰트 시도
-                  font = None
-                  for font_path in [
-                      '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
-                      '/usr/share/fonts/noto-cjk/NotoSansCJKkr-Bold.otf',
-                      '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
-                  ]:
-                      if os.path.exists(font_path):
-                          try:
-                              font = ImageFont.truetype(font_path, size)
-                              break
-                          except: pass
-                  if not font:
-                      font = ImageFont.load_default()
-
-                  if el_type == 'rect':
-                      rx, ry = el.get('rx', 60), el.get('ry', 60)
-                      rw, rh = el.get('rw', 960), el.get('rh', 200)
-                      draw.rounded_rectangle([rx, ry, rx+rw, ry+rh], radius=20, fill=el.get('fill', BG_CARD))
-                  elif el_type == 'text':
-                      # 텍스트 줄 바꿈
-                      words = text.split()
-                      lines = []
-                      line = ''
-                      for word in words:
-                          test = (line + ' ' + word).strip()
-                          bbox = draw.textbbox((0,0), test, font=font)
-                          if bbox[2] - bbox[0] > 960:
-                              if line: lines.append(line)
-                              line = word
-                          else:
-                              line = test
-                      if line: lines.append(line)
-
-                      total_h = len(lines) * (size + 8)
-                      cur_y = y - total_h // 2
-                      for line in lines:
-                          bbox = draw.textbbox((0,0), line, font=font)
-                          tw = bbox[2] - bbox[0]
-                          cur_x = (W - tw) // 2 if align == 'center' else x
-                          draw.text((cur_x, cur_y), line, font=font, fill=color)
-                          cur_y += size + 8
-
-              img.save(filename)
-              print(f"Saved: {filename}")
-
-          hook_title = quiz.get('hookTitle', '오늘의 퀴즈')
-          question = quiz.get('question', '')
-          answer = quiz.get('answer', '')
-          explanation = quiz.get('explanation', '')
-          options = quiz.get('options', [])
-          captions = quiz.get('captions', {})
-
           os.makedirs('frames', exist_ok=True)
 
-          # 프레임 1: 훅 타이틀 (3초 = 90프레임)
-          make_frame(BG_DARK, [
-              {'type': 'text', 'text': hook_title, 'y': 800, 'size': 72, 'color': ACCENT_GOLD},
-              {'type': 'text', 'text': captions.get('hook', '맞출 수 있을까요?'), 'y': 920, 'size': 48, 'color': GRAY},
-          ], 'frames/frame_hook.png')
+          BG      = (11,11,14)
+          CARD    = (22,22,28)
+          ACCENT  = (91,127,255)
+          GOLD    = (255,209,102)
+          GREEN   = (78,205,196)
+          RED     = (255,107,107)
+          WHITE   = (240,240,248)
+          GRAY    = (130,130,148)
+          DIM     = (55,55,68)
 
-          # 프레임 2: 문제 (15초)
-          opts_text = '  /  '.join(options) if options else ''
-          make_frame(BG_DARK, [
-              {'type': 'text', 'text': '[ 문 제 ]', 'y': 640, 'size': 36, 'color': GRAY},
-              {'type': 'text', 'text': question, 'y': 780, 'size': 58, 'color': WHITE},
-              {'type': 'text', 'text': opts_text, 'y': 960, 'size': 40, 'color': GRAY},
-          ], 'frames/frame_question.png')
+          def font(size):
+              for p in [
+                  '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+                  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+                  '/usr/share/fonts/noto-cjk/NotoSansCJKkr-Bold.otf',
+                  '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
+              ]:
+                  if os.path.exists(p):
+                      try: return ImageFont.truetype(p, size)
+                      except: pass
+              return ImageFont.load_default()
 
-          # 프레임 3: 카운트다운 (5초)
-          make_frame(BG_DARK, [
-              {'type': 'text', 'text': '⏱', 'y': 760, 'size': 120, 'color': ACCENT},
-              {'type': 'text', 'text': captions.get('countdown', '3  2  1'), 'y': 940, 'size': 80, 'color': WHITE},
-          ], 'frames/frame_countdown.png')
+          def center_text(draw, text, y, f, color, max_w=920):
+              if not text: return y
+              words = text.split()
+              lines, cur = [], ''
+              for w in words:
+                  t = (cur+' '+w).strip()
+                  if draw.textbbox((0,0),t,font=f)[2] > max_w and cur:
+                      lines.append(cur); cur = w
+                  else: cur = t
+              if cur: lines.append(cur)
+              for line in lines:
+                  bb = draw.textbbox((0,0),line,font=f)
+                  draw.text(((W-(bb[2]-bb[0]))//2, y), line, font=f, fill=color)
+                  y += bb[3]-bb[1]+10
+              return y
 
-          # 프레임 4: 정답 (10초)
-          make_frame(BG_DARK, [
-              {'type': 'text', 'text': '정 답', 'y': 620, 'size': 40, 'color': GRAY},
-              {'type': 'text', 'text': answer, 'y': 780, 'size': 80, 'color': GREEN},
-              {'type': 'text', 'text': explanation[:40] + ('...' if len(explanation)>40 else ''),
-               'y': 960, 'size': 36, 'color': GRAY},
-          ], 'frames/frame_answer.png')
+          def base(accent=ACCENT):
+              img = Image.new('RGB',(W,H),BG)
+              d = ImageDraw.Draw(img)
+              d.rectangle([0,0,W,6], fill=accent)
+              d.rectangle([0,H-6,W,H], fill=accent)
+              return img, d
 
-          # 프레임 5: CTA (3초)
-          make_frame(BG_DARK, [
-              {'type': 'text', 'text': '구독하면 매일 퀴즈!', 'y': 800, 'size': 60, 'color': ACCENT_GOLD},
-              {'type': 'text', 'text': '좋아요 & 구독 👍', 'y': 920, 'size': 48, 'color': WHITE},
-          ], 'frames/frame_cta.png')
+          def rrect(d, x1,y1,x2,y2,r,fill):
+              d.rounded_rectangle([x1,y1,x2,y2],radius=r,fill=fill)
 
-          print("All frames generated!")
+          hook  = quiz.get('hookTitle','오늘의 퀴즈')
+          q     = quiz.get('question','')
+          ans   = quiz.get('answer','')
+          exp   = quiz.get('explanation','')
+          opts  = quiz.get('options',[])
+          caps  = quiz.get('captions',{})
+          diff  = quiz.get('difficulty','normal')
+          dc    = {'easy':GREEN,'normal':GOLD,'hard':RED}.get(diff,GOLD)
+          dl    = {'easy':'EASY ✅','normal':'NORMAL ⚡','hard':'HARD 🔥'}.get(diff,'NORMAL')
+
+          # ── Frame 1: Hook ──
+          img,d = base(ACCENT)
+          rrect(d, 60,640,W-60,1080,28,CARD)
+          rrect(d, 60,640,W-60,648,4,ACCENT)
+          f36=font(36); f72=font(72); f44=font(44); f30=font(30)
+          # 난이도 뱃지
+          bb=d.textbbox((0,0),dl,font=f36); bw=bb[2]-bb[0]+32
+          rrect(d,(W-bw)//2,670,(W+bw)//2,716,10,dc)
+          d.text(((W-(bb[2]-bb[0]))//2,674),dl,font=f36,fill=BG)
+          center_text(d,hook,760,f72,WHITE)
+          center_text(d,caps.get('hook','맞출 수 있을까요?'),960,f44,GRAY)
+          center_text(d,'▼  계속 보기',1820,f30,DIM)
+          img.save('frames/f1.png'); print("f1 done")
+
+          # ── Frame 2: Question ──
+          img,d = base(ACCENT)
+          f38=font(38); f58=font(58); f42=font(42); f28=font(28)
+          center_text(d,'[ Q U E S T I O N ]',140,f38,ACCENT)
+          d.rectangle([120,208,W-120,212],fill=DIM)
+          rrect(d,60,240,W-60,int(H*0.62),24,CARD)
+          y = center_text(d,q,300,f58,WHITE,max_w=880)
+          if opts:
+              y=max(y,700); f_o=font(44)
+              for opt in opts[:4]:
+                  rrect(d,100,y,W-100,y+68,12,DIM)
+                  d.text((130,y+10),opt,font=f_o,fill=WHITE); y+=84
+          center_text(d,'⏳ 생각해보세요...',int(H*0.64)+20,f42,GRAY)
+          center_text(d,'🔔 구독하면 매일 퀴즈',1820,f28,DIM)
+          img.save('frames/f2.png'); print("f2 done")
+
+          # ── Frame 3: Countdown ──
+          img,d = base(GOLD)
+          f44=font(44); f180=font(180); f52=font(52)
+          rrect(d,60,680,W-60,1120,28,CARD)
+          center_text(d,'정답은...?',720,f44,GRAY)
+          center_text(d,'?',760,f180,GOLD)
+          center_text(d,caps.get('countdown','5  4  3  2  1'),1060,f52,WHITE)
+          img.save('frames/f3.png'); print("f3 done")
+
+          # ── Frame 4: Answer ──
+          img,d = base(GREEN)
+          f38=font(38); f80=font(80); f36=font(36); f46=font(46)
+          center_text(d,'[ A N S W E R ]',140,f38,GREEN)
+          d.rectangle([120,208,W-120,212],fill=DIM)
+          rrect(d,60,240,W-60,520,24,CARD)
+          rrect(d,60,240,W-60,248,4,GREEN)
+          center_text(d,'정  답',268,f36,GREEN)
+          center_text(d,ans,330,f80,WHITE,max_w=900)
+          rrect(d,60,560,W-60,1080,24,CARD)
+          center_text(d,'📖  해  설',600,f36,GRAY)
+          d.rectangle([120,648,W-120,652],fill=DIM)
+          center_text(d,exp,680,f46,WHITE,max_w=880)
+          img.save('frames/f4.png'); print("f4 done")
+
+          # ── Frame 5: CTA ──
+          img,d = base(ACCENT)
+          f64=font(64); f50=font(50); f52=font(52); f38=font(38)
+          rrect(d,60,620,W-60,1140,28,CARD)
+          center_text(d,'재미있었나요? 😄',680,f64,WHITE)
+          center_text(d,'매일 새로운 퀴즈 업로드!',820,f50,GOLD)
+          rrect(d,140,920,W-140,1020,20,ACCENT)
+          center_text(d,'👍 좋아요    🔔 구독',936,f52,WHITE)
+          center_text(d,caps.get('cta','댓글로 정답 맞춰보세요!'),1060,f38,GRAY)
+          img.save('frames/f5.png'); print("f5 done")
+
+          print("All frames done!")
           EOF
 
-      - name: Compose video with FFmpeg
+      - name: Compose video
         run: |
-          # 나레이션 mp3 유효성 확인
-          if [ ! -s narration.mp3 ]; then
-            # 무음 오디오 생성 (36초)
-            ffmpeg -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -t 36 -q:a 9 -acodec libmp3lame silence.mp3 -y
-            mv silence.mp3 narration.mp3
+          set -e
+
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: $(du -h narration.mp3)"
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: $(du -h bgm.mp3)"
+
+          for i in 1 2 3 4 5; do
+            name=$(ls frames/f${i}.png 2>/dev/null || echo "")
+            [ -z "$name" ] && echo "Missing frame $i" && exit 1
+          done
+
+          dur=(3 15 5 10 4)
+          for i in 1 2 3 4 5; do
+            ffmpeg -loop 1 -i frames/f${i}.png -t ${dur[$((i-1))]} \
+              -vf "scale=1080:1920:flags=lanczos,fps=30" \
+              -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
+              s${i}.mp4 -y -loglevel error
+          done
+
+          printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
+          ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel error
+          DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
+          echo "Merged duration: ${DUR}s"
+
+          if $has_tts && $has_bgm; then
+            ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
+              -filter_complex \
+                "[1:a]apad,atrim=duration=${DUR}[tts];[2:a]apad,atrim=duration=${DUR},volume=0.12[bgm];[tts][bgm]amix=inputs=2:duration=first[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
+              quiz_video.mp4 -y -loglevel error
+          elif $has_tts; then
+            ffmpeg -i merged.mp4 -i narration.mp3 \
+              -filter_complex "[1:a]apad,atrim=duration=${DUR}[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
+              quiz_video.mp4 -y -loglevel error
+          elif $has_bgm; then
+            ffmpeg -i merged.mp4 -stream_loop -1 -i bgm.mp3 \
+              -filter_complex "[1:a]atrim=duration=${DUR},volume=0.3[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
+              quiz_video.mp4 -y -loglevel error
+          else
+            cp merged.mp4 quiz_video.mp4
           fi
 
-          # 각 장면별 정지 영상 생성
-          ffmpeg -loop 1 -i frames/frame_hook.png -t 3 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene1.mp4 -y
-          ffmpeg -loop 1 -i frames/frame_question.png -t 15 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene2.mp4 -y
-          ffmpeg -loop 1 -i frames/frame_countdown.png -t 5 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene3.mp4 -y
-          ffmpeg -loop 1 -i frames/frame_answer.png -t 10 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene4.mp4 -y
-          ffmpeg -loop 1 -i frames/frame_cta.png -t 3 -vf "scale=1080:1920" -r 30 -pix_fmt yuv420p scene5.mp4 -y
-
-          # 영상 concat
-          echo "file 'scene1.mp4'" > concat.txt
-          echo "file 'scene2.mp4'" >> concat.txt
-          echo "file 'scene3.mp4'" >> concat.txt
-          echo "file 'scene4.mp4'" >> concat.txt
-          echo "file 'scene5.mp4'" >> concat.txt
-
-          ffmpeg -f concat -safe 0 -i concat.txt -c copy merged.mp4 -y
-
-          # 나레이션 합성 (영상 길이에 맞게 trim)
-          VIDEO_DURATION=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
-          ffmpeg -i merged.mp4 -i narration.mp3 \
-            -filter_complex "[1:a]atrim=duration=${VIDEO_DURATION}[a]" \
-            -map 0:v -map "[a]" \
-            -c:v copy -c:a aac -shortest \
-            quiz_video.mp4 -y
-
-          echo "Video rendering complete!"
           ls -lh quiz_video.mp4
+          ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
-      - name: Upload video as artifact
+      - name: Upload video
         uses: actions/upload-artifact@v4
         with:
           name: quiz-video-${{ github.run_number }}
           path: quiz_video.mp4
           retention-days: 7
 
-      - name: Upload frames as artifact
+      - name: Upload frames
         uses: actions/upload-artifact@v4
         with:
           name: quiz-frames-${{ github.run_number }}
