@@ -13,82 +13,87 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg & fonts
+      - name: Install deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg fonts-noto-cjk imagemagick wget
+          sudo apt-get install -y ffmpeg fonts-noto-cjk wget python3-pip
           fc-cache -fv
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          ffmpeg -version | head -1
 
       - name: Install Python deps
-        run: pip install requests pillow
+        run: pip install requests pillow --break-system-packages 2>/dev/null || pip install requests pillow
 
       - name: Prepare quiz data
         run: |
           echo '${{ toJson(github.event.client_payload.quiz) }}' > quiz_data.json
+          echo "=== Quiz Data ==="
           cat quiz_data.json
 
-      - name: Generate TTS narration
+      - name: Generate TTS
         env:
           GCP_TTS_KEY: ${{ secrets.GCP_TTS_KEY }}
         run: |
           python3 << 'EOF'
-          import json, requests, base64, os
-          with open('quiz_data.json', 'r', encoding='utf-8') as f:
+          import json, requests, base64, os, sys
+          with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
-          tts_key = os.environ.get('GCP_TTS_KEY', '')
-          narration = quiz.get('narration', {})
-          full = ' '.join([narration.get(k,'') for k in ['intro','question','countdown','answer','outro']])
-          if tts_key and full.strip():
-              resp = requests.post(
-                  f'https://texttospeech.googleapis.com/v1/text:synthesize?key={tts_key}',
-                  json={
-                      'input': {'text': full},
-                      'voice': {'languageCode':'ko-KR','name':'ko-KR-Wavenet-C','ssmlGender':'FEMALE'},
-                      'audioConfig': {'audioEncoding':'MP3','speakingRate':1.05}
-                  }
-              )
-              if resp.ok and resp.json().get('audioContent'):
-                  with open('narration.mp3','wb') as f:
-                      f.write(base64.b64decode(resp.json()['audioContent']))
-                  print("TTS OK:", os.path.getsize('narration.mp3'), "bytes")
-              else:
-                  print("TTS fail:", resp.status_code)
-                  open('narration.mp3','wb').close()
-          else:
+          key = os.environ.get('GCP_TTS_KEY','')
+          print(f"TTS key present: {bool(key)} len={len(key)}")
+          if not key:
+              print("ERROR: GCP_TTS_KEY not set in GitHub Secrets!")
               open('narration.mp3','wb').close()
-              print("No TTS key or text")
+              sys.exit(0)
+          n = quiz.get('narration',{})
+          text = ' '.join([n.get(k,'') for k in ['intro','question','countdown','answer','outro'] if n.get(k)])
+          print(f"Narration text length: {len(text)}")
+          if not text.strip():
+              open('narration.mp3','wb').close()
+              sys.exit(0)
+          resp = requests.post(
+              f'https://texttospeech.googleapis.com/v1/text:synthesize?key={key}',
+              json={
+                  'input':{'text':text},
+                  'voice':{'languageCode':'ko-KR','name':'ko-KR-Wavenet-C','ssmlGender':'FEMALE'},
+                  'audioConfig':{'audioEncoding':'MP3','speakingRate':1.0,'pitch':0.0}
+              }
+          )
+          print(f"TTS response: {resp.status_code}")
+          if resp.ok and resp.json().get('audioContent'):
+              data = base64.b64decode(resp.json()['audioContent'])
+              open('narration.mp3','wb').write(data)
+              print(f"TTS saved: {len(data)} bytes")
+          else:
+              print(f"TTS error: {resp.text[:200]}")
+              open('narration.mp3','wb').close()
           EOF
 
-      - name: Download background music
+      - name: Download BGM
         run: |
           python3 << 'EOF'
           import json, requests, os
           with open('quiz_data.json','r',encoding='utf-8') as f:
               quiz = json.load(f)
           hook = quiz.get('hookTitle','')
-          bright_kw = ['심리','상식','넌센스','쉬움','easy']
-          mood = 'bright' if any(k in hook for k in bright_kw) else 'mystery'
-          urls = {
-              'mystery': ['https://freepd.com/music/Investigations.mp3','https://freepd.com/music/Sneaky%20Snitch.mp3'],
-              'bright':  ['https://freepd.com/music/Funky%20Chunk.mp3','https://freepd.com/music/Happy%20Boy%20Theme.mp3']
-          }
-          for url in urls[mood]:
+          bright = any(k in hook for k in ['심리','상식','넌센스','쉬움'])
+          urls = [
+              'https://freepd.com/music/Investigations.mp3',
+              'https://freepd.com/music/Sneaky%20Snitch.mp3',
+          ] if not bright else [
+              'https://freepd.com/music/Funky%20Chunk.mp3',
+              'https://freepd.com/music/Happy%20Boy%20Theme.mp3',
+          ]
+          for url in urls:
               try:
-                  r = requests.get(url, timeout=15, headers={'User-Agent':'Mozilla/5.0'})
-                  if r.ok and len(r.content) > 5000:
+                  r = requests.get(url, timeout=20, headers={'User-Agent':'Mozilla/5.0'})
+                  if r.ok and len(r.content) > 10000:
                       open('bgm.mp3','wb').write(r.content)
-                      print(f"BGM OK: {url} {len(r.content)}bytes mood={mood}")
+                      print(f"BGM OK {len(r.content)} bytes: {url}")
                       break
               except Exception as e:
                   print(f"BGM fail: {e}")
           else:
               open('bgm.mp3','wb').close()
-              print("No BGM")
+              print("BGM not available")
           EOF
 
       - name: Render frames
@@ -103,17 +108,18 @@ jobs:
           W, H = 1080, 1920
           os.makedirs('frames', exist_ok=True)
 
-          BG      = (11,11,14)
-          CARD    = (22,22,28)
-          ACCENT  = (91,127,255)
-          GOLD    = (255,209,102)
-          GREEN   = (78,205,196)
-          RED     = (255,107,107)
-          WHITE   = (240,240,248)
-          GRAY    = (130,130,148)
-          DIM     = (55,55,68)
+          # 컬러
+          BG     = (11,11,14)
+          CARD   = (22,22,28)
+          ACCENT = (91,127,255)
+          GOLD   = (255,209,102)
+          GREEN  = (78,205,196)
+          RED    = (255,100,100)
+          WHITE  = (240,240,248)
+          GRAY   = (130,130,148)
+          DIM    = (50,50,62)
 
-          def font(size):
+          def fnt(size):
               for p in [
                   '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
                   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
@@ -125,155 +131,200 @@ jobs:
                       except: pass
               return ImageFont.load_default()
 
-          def center_text(draw, text, y, f, color, max_w=920):
-              if not text: return y
+          def wrap_text(draw, text, font, max_w):
               words = text.split()
               lines, cur = [], ''
               for w in words:
                   t = (cur+' '+w).strip()
-                  if draw.textbbox((0,0),t,font=f)[2] > max_w and cur:
+                  if draw.textbbox((0,0),t,font=font)[2] > max_w and cur:
                       lines.append(cur); cur = w
                   else: cur = t
               if cur: lines.append(cur)
+              return lines
+
+          def center(draw, text, y, font, color, max_w=920, spacing=12):
+              lines = wrap_text(draw, text, font, max_w)
               for line in lines:
-                  bb = draw.textbbox((0,0),line,font=f)
-                  draw.text(((W-(bb[2]-bb[0]))//2, y), line, font=f, fill=color)
-                  y += bb[3]-bb[1]+10
+                  bb = draw.textbbox((0,0),line,font=font)
+                  draw.text(((W-(bb[2]-bb[0]))//2, y), line, font=font, fill=color)
+                  y += bb[3]-bb[1]+spacing
               return y
 
-          def base(accent=ACCENT):
+          def base_img(top_color=ACCENT):
               img = Image.new('RGB',(W,H),BG)
               d = ImageDraw.Draw(img)
-              d.rectangle([0,0,W,6], fill=accent)
-              d.rectangle([0,H-6,W,H], fill=accent)
+              d.rectangle([0,0,W,8], fill=top_color)
+              d.rectangle([0,H-8,W,H], fill=top_color)
               return img, d
 
-          def rrect(d, x1,y1,x2,y2,r,fill):
-              d.rounded_rectangle([x1,y1,x2,y2],radius=r,fill=fill)
+          def card(d, x1,y1,x2,y2, radius=24, fill=CARD, border=None):
+              d.rounded_rectangle([x1,y1,x2,y2], radius=radius, fill=fill)
+              if border:
+                  d.rounded_rectangle([x1,y1,x2,y1+6], radius=0, fill=border)
 
-          hook  = quiz.get('hookTitle','오늘의 퀴즈')
-          q     = quiz.get('question','')
-          ans   = quiz.get('answer','')
-          exp   = quiz.get('explanation','')
-          opts  = quiz.get('options',[])
-          caps  = quiz.get('captions',{})
-          diff  = quiz.get('difficulty','normal')
-          dc    = {'easy':GREEN,'normal':GOLD,'hard':RED}.get(diff,GOLD)
-          dl    = {'easy':'EASY ✅','normal':'NORMAL ⚡','hard':'HARD 🔥'}.get(diff,'NORMAL')
+          hook = quiz.get('hookTitle','오늘의 퀴즈')
+          q    = quiz.get('question','')
+          ans  = quiz.get('answer','')
+          exp  = quiz.get('explanation','')
+          opts = quiz.get('options',[])
+          diff = quiz.get('difficulty','normal')
 
-          # ── Frame 1: Hook ──
-          img,d = base(ACCENT)
-          rrect(d, 60,640,W-60,1080,28,CARD)
-          rrect(d, 60,640,W-60,648,4,ACCENT)
-          f36=font(36); f72=font(72); f44=font(44); f30=font(30)
-          # 난이도 뱃지
-          bb=d.textbbox((0,0),dl,font=f36); bw=bb[2]-bb[0]+32
-          rrect(d,(W-bw)//2,670,(W+bw)//2,716,10,dc)
-          d.text(((W-(bb[2]-bb[0]))//2,674),dl,font=f36,fill=BG)
-          center_text(d,hook,760,f72,WHITE)
-          center_text(d,caps.get('hook','맞출 수 있을까요?'),960,f44,GRAY)
-          center_text(d,'▼  계속 보기',1820,f30,DIM)
-          img.save('frames/f1.png'); print("f1 done")
+          dc = {'easy':GREEN,'normal':GOLD,'hard':RED}.get(diff,GOLD)
+          dl = {'easy':'EASY','normal':'NORMAL','hard':'HARD'}.get(diff,'NORMAL')
 
-          # ── Frame 2: Question ──
-          img,d = base(ACCENT)
-          f38=font(38); f58=font(58); f42=font(42); f28=font(28)
-          center_text(d,'[ Q U E S T I O N ]',140,f38,ACCENT)
-          d.rectangle([120,208,W-120,212],fill=DIM)
-          rrect(d,60,240,W-60,int(H*0.62),24,CARD)
-          y = center_text(d,q,300,f58,WHITE,max_w=880)
+          # ── F1: Hook (3초) ──
+          img,d = base_img(ACCENT)
+          card(d, 80,620,W-80,1100, border=ACCENT)
+          # 난이도
+          f34=fnt(34); bb=d.textbbox((0,0),dl,font=f34); bw=bb[2]-bb[0]+40
+          d.rounded_rectangle([(W-bw)//2,650,(W+bw)//2,694], radius=8, fill=dc)
+          d.text(((W-(bb[2]-bb[0]))//2,654), dl, font=f34, fill=BG)
+          # 제목
+          center(d, hook, 740, fnt(70), WHITE)
+          # 서브
+          center(d, '맞출 수 있을까요?', 960, fnt(44), GRAY)
+          # 하단
+          center(d, '[ 계속 보기 ]', 1830, fnt(30), DIM)
+          img.save('frames/f1_hook.png')
+          print("f1 done")
+
+          # ── F2: Question (화면 - 15초용, 프로그레스바는 FFmpeg으로) ──
+          img,d = base_img(ACCENT)
+          center(d, 'QUESTION', 130, fnt(40), ACCENT)
+          d.rectangle([120,196,W-120,200], fill=DIM)
+          card(d, 60,230,W-60,int(H*0.58), border=ACCENT)
+          y = center(d, q, 290, fnt(60), WHITE, max_w=880, spacing=16)
           if opts:
-              y=max(y,700); f_o=font(44)
+              y = max(y, 680)
               for opt in opts[:4]:
-                  rrect(d,100,y,W-100,y+68,12,DIM)
-                  d.text((130,y+10),opt,font=f_o,fill=WHITE); y+=84
-          center_text(d,'⏳ 생각해보세요...',int(H*0.64)+20,f42,GRAY)
-          center_text(d,'🔔 구독하면 매일 퀴즈',1820,f28,DIM)
-          img.save('frames/f2.png'); print("f2 done")
+                  card(d, 100,y,W-100,y+70, radius=12, fill=DIM)
+                  d.text((130,y+12), opt, font=fnt(44), fill=WHITE)
+                  y += 86
+          center(d, '생각해보세요...', int(H*0.60)+10, fnt(40), GRAY)
+          center(d, '구독하면 매일 퀴즈', 1828, fnt(28), DIM)
+          img.save('frames/f2_question.png')
+          print("f2 done")
 
-          # ── Frame 3: Countdown ──
-          img,d = base(GOLD)
-          f44=font(44); f180=font(180); f52=font(52)
-          rrect(d,60,680,W-60,1120,28,CARD)
-          center_text(d,'정답은...?',720,f44,GRAY)
-          center_text(d,'?',760,f180,GOLD)
-          center_text(d,caps.get('countdown','5  4  3  2  1'),1060,f52,WHITE)
-          img.save('frames/f3.png'); print("f3 done")
+          # ── F3_1~5: 카운트다운 (각 1초, 숫자별로) ──
+          for num in [5,4,3,2,1]:
+              img,d = base_img(GOLD)
+              card(d, 80,660,W-80,1120, border=GOLD)
+              center(d, '정답은...?', 700, fnt(44), GRAY)
+              # 큰 숫자
+              f_num = fnt(260)
+              bb = d.textbbox((0,0), str(num), font=f_num)
+              d.text(((W-(bb[2]-bb[0]))//2, 760), str(num), font=f_num, fill=GOLD)
+              img.save(f'frames/f3_{num}.png')
+          print("f3 countdown done")
 
-          # ── Frame 4: Answer ──
-          img,d = base(GREEN)
-          f38=font(38); f80=font(80); f36=font(36); f46=font(46)
-          center_text(d,'[ A N S W E R ]',140,f38,GREEN)
-          d.rectangle([120,208,W-120,212],fill=DIM)
-          rrect(d,60,240,W-60,520,24,CARD)
-          rrect(d,60,240,W-60,248,4,GREEN)
-          center_text(d,'정  답',268,f36,GREEN)
-          center_text(d,ans,330,f80,WHITE,max_w=900)
-          rrect(d,60,560,W-60,1080,24,CARD)
-          center_text(d,'📖  해  설',600,f36,GRAY)
-          d.rectangle([120,648,W-120,652],fill=DIM)
-          center_text(d,exp,680,f46,WHITE,max_w=880)
-          img.save('frames/f4.png'); print("f4 done")
+          # ── F4: Answer (10초) ──
+          img,d = base_img(GREEN)
+          center(d, 'ANSWER', 130, fnt(40), GREEN)
+          d.rectangle([120,196,W-120,200], fill=DIM)
+          card(d, 60,230,W-60,500, border=GREEN)
+          center(d, '정  답', 260, fnt(36), GREEN)
+          center(d, ans, 325, fnt(84), WHITE, max_w=900)
+          card(d, 60,540,W-60,1080, border=DIM)
+          center(d, '해  설', 580, fnt(36), GRAY)
+          d.rectangle([120,630,W-120,634], fill=DIM)
+          center(d, exp, 660, fnt(46), WHITE, max_w=880, spacing=14)
+          img.save('frames/f4_answer.png')
+          print("f4 done")
 
-          # ── Frame 5: CTA ──
-          img,d = base(ACCENT)
-          f64=font(64); f50=font(50); f52=font(52); f38=font(38)
-          rrect(d,60,620,W-60,1140,28,CARD)
-          center_text(d,'재미있었나요? 😄',680,f64,WHITE)
-          center_text(d,'매일 새로운 퀴즈 업로드!',820,f50,GOLD)
-          rrect(d,140,920,W-140,1020,20,ACCENT)
-          center_text(d,'👍 좋아요    🔔 구독',936,f52,WHITE)
-          center_text(d,caps.get('cta','댓글로 정답 맞춰보세요!'),1060,f38,GRAY)
-          img.save('frames/f5.png'); print("f5 done")
-
-          print("All frames done!")
+          # ── F5: CTA (4초) ──
+          img,d = base_img(ACCENT)
+          card(d, 60,600,W-60,1160, border=ACCENT)
+          center(d, '재미있었나요?', 660, fnt(66), WHITE)
+          center(d, '매일 새 퀴즈 업로드!', 800, fnt(50), GOLD)
+          d.rounded_rectangle([140,910,W-140,1010], radius=20, fill=ACCENT)
+          center(d, '좋아요 + 구독', 930, fnt(52), WHITE)
+          center(d, '댓글로 정답 맞춰보세요', 1050, fnt(38), GRAY)
+          img.save('frames/f5_cta.png')
+          print("f5 done")
+          print("All frames rendered!")
           EOF
 
       - name: Compose video
         run: |
           set -e
+          echo "=== Audio check ==="
+          ls -lh narration.mp3 bgm.mp3 2>/dev/null || true
+          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: OK $(du -h narration.mp3)"
+          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: OK $(du -h bgm.mp3)"
 
-          has_tts=false; [ -s narration.mp3 ] && has_tts=true && echo "TTS: $(du -h narration.mp3)"
-          has_bgm=false; [ -s bgm.mp3 ]       && has_bgm=true && echo "BGM: $(du -h bgm.mp3)"
+          echo "=== Building scenes ==="
 
-          for i in 1 2 3 4 5; do
-            name=$(ls frames/f${i}.png 2>/dev/null || echo "")
-            [ -z "$name" ] && echo "Missing frame $i" && exit 1
-          done
+          # Scene1: Hook 3초
+          ffmpeg -loop 1 -i frames/f1_hook.png -t 3 \
+            -vf "scale=1080:1920:flags=lanczos,fps=30" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
+            s1.mp4 -y -loglevel warning
 
-          dur=(3 15 5 10 4)
-          for i in 1 2 3 4 5; do
-            ffmpeg -loop 1 -i frames/f${i}.png -t ${dur[$((i-1))]} \
-              -vf "scale=1080:1920:flags=lanczos,fps=30" \
+          # Scene2: Question 15초 + 프로그레스바 (하단 파란 바가 15초에 걸쳐 채워짐)
+          ffmpeg -loop 1 -i frames/f2_question.png -t 15 \
+            -vf "scale=1080:1920:flags=lanczos,fps=30,
+                 drawbox=x=0:y=1880:w='iw*t/15':h=12:color=5b7fff@0.9:t=fill" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
+            s2.mp4 -y -loglevel warning
+
+          # Scene3: 카운트다운 5,4,3,2,1 각 1초 (페이드인 효과 포함)
+          for num in 5 4 3 2 1; do
+            ffmpeg -loop 1 -i frames/f3_${num}.png -t 1 \
+              -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.15" \
               -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
-              s${i}.mp4 -y -loglevel error
+              cd${num}.mp4 -y -loglevel warning
           done
 
-          printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
-          ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel error
-          DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
-          echo "Merged duration: ${DUR}s"
+          # 카운트다운 합치기
+          printf "file 'cd5.mp4'\nfile 'cd4.mp4'\nfile 'cd3.mp4'\nfile 'cd2.mp4'\nfile 'cd1.mp4'\n" > cdlist.txt
+          ffmpeg -f concat -safe 0 -i cdlist.txt -c copy s3.mp4 -y -loglevel warning
 
+          # Scene4: Answer 10초 (페이드인)
+          ffmpeg -loop 1 -i frames/f4_answer.png -t 10 \
+            -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.3" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
+            s4.mp4 -y -loglevel warning
+
+          # Scene5: CTA 4초
+          ffmpeg -loop 1 -i frames/f5_cta.png -t 4 \
+            -vf "scale=1080:1920:flags=lanczos,fps=30,fade=t=in:st=0:d=0.3" \
+            -pix_fmt yuv420p -c:v libx264 -preset fast -crf 18 \
+            s5.mp4 -y -loglevel warning
+
+          # 전체 합치기
+          printf "file 's1.mp4'\nfile 's2.mp4'\nfile 's3.mp4'\nfile 's4.mp4'\nfile 's5.mp4'\n" > cl.txt
+          ffmpeg -f concat -safe 0 -i cl.txt -c copy merged.mp4 -y -loglevel warning
+          DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 merged.mp4)
+          echo "Total duration: ${DUR}s"
+
+          echo "=== Mixing audio ==="
           if $has_tts && $has_bgm; then
+            echo "Mixing TTS + BGM"
             ffmpeg -i merged.mp4 -i narration.mp3 -stream_loop -1 -i bgm.mp3 \
               -filter_complex \
-                "[1:a]apad,atrim=duration=${DUR}[tts];[2:a]apad,atrim=duration=${DUR},volume=0.12[bgm];[tts][bgm]amix=inputs=2:duration=first[a]" \
-              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
-              quiz_video.mp4 -y -loglevel error
+                "[1:a]apad,atrim=duration=${DUR}[tts];
+                 [2:a]apad,atrim=duration=${DUR},volume=0.10[bgm];
+                 [tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
+              quiz_video.mp4 -y -loglevel warning
           elif $has_tts; then
+            echo "TTS only"
             ffmpeg -i merged.mp4 -i narration.mp3 \
               -filter_complex "[1:a]apad,atrim=duration=${DUR}[a]" \
-              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
-              quiz_video.mp4 -y -loglevel error
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
+              quiz_video.mp4 -y -loglevel warning
           elif $has_bgm; then
-            ffmpeg -i merged.mp4 -stream_loop -1 -i bgm.mp3 \
-              -filter_complex "[1:a]atrim=duration=${DUR},volume=0.3[a]" \
-              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest \
-              quiz_video.mp4 -y -loglevel error
+            echo "BGM only"
+            ffmpeg -stream_loop -1 -i bgm.mp3 -i merged.mp4 \
+              -filter_complex "[0:a]atrim=duration=${DUR},volume=0.25[a]" \
+              -map 1:v -map "[a]" -c:v copy -c:a aac -b:a 192k \
+              quiz_video.mp4 -y -loglevel warning
           else
+            echo "No audio"
             cp merged.mp4 quiz_video.mp4
           fi
 
+          echo "=== Final output ==="
           ls -lh quiz_video.mp4
           ffprobe -v quiet -show_entries format=duration:format=size -of default=noprint_wrappers=1 quiz_video.mp4
 
