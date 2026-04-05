@@ -11,7 +11,6 @@
 <body>
   <div class="app">
 
-    <!-- 사이드바 -->
     <nav class="sidebar">
       <div class="sidebar-header">
         <div class="logo">
@@ -49,38 +48,37 @@
       </div>
     </nav>
 
-    <!-- 메인 콘텐츠 -->
     <main class="main-content">
 
       <!-- ===================== 쿠팡 파트너스 탭 ===================== -->
       <section class="tab-panel active" id="tab-coupang">
         <div class="panel-header">
           <h1>쿠팡 파트너스</h1>
-          <p>상품 상세페이지 스크린샷을 올리면 AI가 분석하고 홍보글을 생성합니다</p>
+          <p>상세페이지 스크린샷을 붙여넣기(Ctrl+V)하거나 업로드하면 AI가 분석합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
-
-            <!-- 왼쪽: 입력 -->
             <div class="col">
 
-              <!-- STEP 1: 이미지 업로드 -->
+              <!-- STEP 1 -->
               <div class="card">
                 <div class="card-title">
-                  <span>STEP 1 — 상세페이지 스크린샷 업로드</span>
-                  <span style="font-size:10px;color:#55556a;font-weight:400">최대 3장</span>
+                  STEP 1 — 상세페이지 스크린샷
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span id="coupangImageCount" style="font-size:10px;color:#3ecfb2;font-weight:400"></span>
+                    <button class="btn-sm" onclick="resetCoupangImages()" style="font-size:10px">초기화</button>
+                  </div>
                 </div>
 
                 <div class="dropzone" id="coupangDropzone">
                   <div class="dropzone-inner">
-                    <span class="dropzone-icon">📷</span>
-                    <p class="dropzone-text">클릭하거나 이미지를 드래그하세요</p>
-                    <p class="dropzone-sub">쿠팡 상세페이지를 스크롤하며 스크린샷 1~3장</p>
+                    <span class="dropzone-icon">📋</span>
+                    <p class="dropzone-text">Ctrl+V 붙여넣기 / 클릭 업로드 / 드래그앤드롭</p>
+                    <p class="dropzone-sub">스크롤하며 찍은 스크린샷 여러 장 가능</p>
                   </div>
                 </div>
                 <input type="file" id="coupangImageInput" accept="image/*" multiple style="display:none" />
 
-                <!-- 이미지 미리보기 -->
                 <div class="image-preview-row" id="coupangImagePreview" style="display:none"></div>
 
                 <button class="btn btn-primary" id="coupangAnalyzeBtn"
@@ -89,9 +87,9 @@
                 </button>
               </div>
 
-              <!-- STEP 2: 추출 결과 확인 및 수정 -->
+              <!-- STEP 2: 추출 결과 -->
               <div class="card" id="coupangExtractResult" style="display:none">
-                <!-- JS로 렌더링 -->
+                <!-- JS 렌더링 -->
               </div>
 
               <!-- STEP 3: 생성 옵션 -->
@@ -141,14 +139,12 @@
 
             </div>
 
-            <!-- 오른쪽: 결과 -->
             <div class="col">
               <div class="loading-card" id="coupangLoading" style="display:none">
                 <div class="spinner"></div>
                 <p id="coupangLoadingText">분석 중입니다...</p>
               </div>
 
-              <!-- 블로그 홍보글 -->
               <div class="card result-card" id="coupangBlogResult" style="display:none">
                 <div class="card-title">
                   블로그 홍보글
@@ -165,7 +161,6 @@
                 </div>
               </div>
 
-              <!-- 스레드 포스트 -->
               <div class="card result-card" id="coupangThreadsResult" style="display:none">
                 <div class="card-title">
                   스레드 포스트
@@ -176,7 +171,6 @@
                 <div class="threads-list" id="coupangThreadsList"></div>
               </div>
             </div>
-
           </div>
         </div>
       </section>
