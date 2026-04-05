@@ -1,83 +1,69 @@
 // ===== settings.js — API 키 관리 =====
 
-const KEY_MAP = {
-  claudeKey: 'CLAUDE_API_KEY',
-  geminiKey: 'GEMINI_API_KEY',
-  ttsKey: 'GCP_TTS_KEY',
-  coupangAccessKey: 'COUPANG_ACCESS_KEY',
-  coupangSecretKey: 'COUPANG_SECRET_KEY',
-  pexelsKey: 'PEXELS_API_KEY',
-  githubToken: 'GITHUB_TOKEN',
-  githubRepo: 'GITHUB_REPO'
-};
-
 const KEY_LABELS = {
-  CLAUDE_API_KEY: 'Claude API Key',
-  GEMINI_API_KEY: 'Gemini API Key',
-  GCP_TTS_KEY: 'Google Cloud TTS',
-  COUPANG_ACCESS_KEY: '쿠팡 Access Key',
-  COUPANG_SECRET_KEY: '쿠팡 Secret Key',
-  PEXELS_API_KEY: 'Pexels API Key',
-  GITHUB_TOKEN: 'GitHub Token',
-  GITHUB_REPO: 'GitHub Repo'
+  CLAUDE_API_KEY:      '🤖 Claude',
+  PEXELS_API_KEY:      '🖼️ Pexels',
+  COUPANG_ACCESS_KEY:  '🛒 쿠팡 AccessKey',
+  COUPANG_SECRET_KEY:  '🛒 쿠팡 SecretKey',
+  GCP_TTS_KEY:         '🔊 GCP TTS'
 };
-
-// 페이지 로드 시 저장된 키 마스킹 표시
-function loadSavedKeys() {
-  Object.entries(KEY_MAP).forEach(([inputId, storageKey]) => {
-    const saved = localStorage.getItem(storageKey);
-    const input = document.getElementById(inputId);
-    if (saved && input) {
-      if (input.type === 'text') {
-        input.value = saved;
-      } else {
-        input.placeholder = '••••••••• (저장됨)';
-      }
-    }
-  });
-  renderKeyStatus();
-}
 
 function saveKey(inputId, storageKey) {
   const input = document.getElementById(inputId);
   if (!input) return;
-  const val = input.value.trim();
-  if (!val) { showToast('값을 입력해주세요'); return; }
-  localStorage.setItem(storageKey, val);
+  const value = input.value.trim();
+  if (!value) { showToast('값을 입력해주세요'); return; }
+  localStorage.setItem(storageKey, value);
   input.value = '';
-  input.placeholder = '••••••••• (저장됨)';
-  showToast(`${KEY_LABELS[storageKey] || storageKey} 저장됨`);
+  showToast('저장됨!');
   renderKeyStatus();
   updateApiStatus();
+}
+
+function clearAllKeys() {
+  if (!confirm('모든 API 키를 초기화할까요?')) return;
+  Object.keys(KEY_LABELS).forEach(k => localStorage.removeItem(k));
+  renderKeyStatus();
+  updateApiStatus();
+  showToast('초기화됨');
 }
 
 function renderKeyStatus() {
   const grid = document.getElementById('keyStatusGrid');
   if (!grid) return;
   grid.innerHTML = Object.entries(KEY_LABELS).map(([key, label]) => {
-    const isSet = !!localStorage.getItem(key);
+    const saved = !!localStorage.getItem(key);
     return `
       <div class="key-status-item">
-        <div class="key-dot ${isSet ? 'set' : 'unset'}"></div>
+        <span class="dot ${saved ? 'ok' : 'no'}"></span>
         <span>${label}</span>
-        <span style="color:${isSet ? '#4ecdc4' : '#4a4a5a'};margin-left:auto;font-size:11px">${isSet ? '설정됨' : '미설정'}</span>
+        ${saved ? '<span style="color:#3ecfb2;font-size:10px;margin-left:auto">✓</span>' : ''}
       </div>
     `;
   }).join('');
 }
 
-function clearAllKeys() {
-  if (!confirm('모든 API 키를 삭제하시겠습니까?')) return;
-  Object.values(KEY_MAP).forEach(k => localStorage.removeItem(k));
-  loadSavedKeys();
-  updateApiStatus();
-  showToast('모든 키가 초기화되었습니다');
-}
-
-// 설정 탭 진입 시 상태 렌더링
-document.querySelector('[data-tab="settings"]').addEventListener('click', () => {
+// 설정 탭 진입 시 기존 키 마스킹 표시
+document.querySelector('[data-tab="settings"]')?.addEventListener('click', () => {
   renderKeyStatus();
+
+  // 이미 저장된 키 힌트 표시
+  const fields = [
+    ['claudeKey', 'CLAUDE_API_KEY'],
+    ['pexelsKey', 'PEXELS_API_KEY'],
+    ['coupangAccessKey', 'COUPANG_ACCESS_KEY'],
+    ['coupangSecretKey', 'COUPANG_SECRET_KEY'],
+    ['ttsKey', 'GCP_TTS_KEY']
+  ];
+
+  fields.forEach(([inputId, storageKey]) => {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    if (localStorage.getItem(storageKey)) {
+      el.placeholder = '저장됨 (변경하려면 새 값 입력)';
+    }
+  });
 });
 
-// 초기 로드
-loadSavedKeys();
+// 초기 렌더
+renderKeyStatus();
