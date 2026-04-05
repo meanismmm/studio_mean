@@ -56,49 +56,47 @@
       <section class="tab-panel active" id="tab-coupang">
         <div class="panel-header">
           <h1>쿠팡 파트너스</h1>
-          <p>상품 정보를 직접 입력하고 홍보글과 스레드 포스트를 생성합니다</p>
+          <p>상품 상세페이지 스크린샷을 올리면 AI가 분석하고 홍보글을 생성합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
+
+            <!-- 왼쪽: 입력 -->
             <div class="col">
+
+              <!-- STEP 1: 이미지 업로드 -->
               <div class="card">
-                <div class="card-title">상품 정보 입력</div>
-
-                <div class="form-group">
-                  <label>상품명 <span class="required">*</span></label>
-                  <input type="text" id="coupangProductName" placeholder="예: Kismetic 타공판 책상 선반 DIY 수납선반" />
+                <div class="card-title">
+                  <span>STEP 1 — 상세페이지 스크린샷 업로드</span>
+                  <span style="font-size:10px;color:#55556a;font-weight:400">최대 3장</span>
                 </div>
 
-                <div class="form-group">
-                  <label>가격</label>
-                  <input type="text" id="coupangProductPrice" placeholder="예: 29,900원" />
+                <div class="dropzone" id="coupangDropzone">
+                  <div class="dropzone-inner">
+                    <span class="dropzone-icon">📷</span>
+                    <p class="dropzone-text">클릭하거나 이미지를 드래그하세요</p>
+                    <p class="dropzone-sub">쿠팡 상세페이지를 스크롤하며 스크린샷 1~3장</p>
+                  </div>
                 </div>
+                <input type="file" id="coupangImageInput" accept="image/*" multiple style="display:none" />
 
-                <div class="form-group">
-                  <label>카테고리</label>
-                  <select id="coupangCategory">
-                    <option value="home">주방/생활</option>
-                    <option value="beauty">뷰티/건강</option>
-                    <option value="fashion">패션</option>
-                    <option value="digital">디지털/가전</option>
-                    <option value="baby">유아/아동</option>
-                    <option value="pet">반려동물</option>
-                    <option value="sports">스포츠/레저</option>
-                    <option value="food">식품</option>
-                  </select>
-                </div>
+                <!-- 이미지 미리보기 -->
+                <div class="image-preview-row" id="coupangImagePreview" style="display:none"></div>
 
-                <div class="form-group">
-                  <label>상품 특징 <span class="optional">(줄바꿈으로 구분)</span></label>
-                  <textarea id="coupangProductFeatures" rows="4" placeholder="예: 조립식 DIY 구조&#10;책상 위 공간 활용 극대화&#10;타공판으로 원하는 위치에 부속품 배치&#10;강철 소재로 내구성 우수"></textarea>
-                </div>
+                <button class="btn btn-primary" id="coupangAnalyzeBtn"
+                  style="display:none;margin-top:12px" onclick="analyzeCoupangImages()">
+                  <span>🔍 상품 정보 분석</span>
+                </button>
+              </div>
 
-                <div class="form-group">
-                  <label>파트너스 링크 <span class="optional">(생성된 글에 삽입)</span></label>
-                  <input type="text" id="coupangAffiliateUrl" placeholder="https://link.coupang.com/a/..." />
-                </div>
+              <!-- STEP 2: 추출 결과 확인 및 수정 -->
+              <div class="card" id="coupangExtractResult" style="display:none">
+                <!-- JS로 렌더링 -->
+              </div>
 
-                <div class="divider"></div>
+              <!-- STEP 3: 생성 옵션 -->
+              <div class="card" id="coupangOptionsCard" style="display:none">
+                <div class="card-title">STEP 3 — 생성 옵션</div>
 
                 <div class="form-group">
                   <label>생성 유형</label>
@@ -137,18 +135,20 @@
                 </div>
 
                 <button class="btn btn-primary" onclick="generateCoupangContent()">
-                  <span>홍보글 생성</span>
+                  <span>✍️ 홍보글 생성</span>
                 </button>
               </div>
+
             </div>
 
+            <!-- 오른쪽: 결과 -->
             <div class="col">
               <div class="loading-card" id="coupangLoading" style="display:none">
                 <div class="spinner"></div>
-                <p id="coupangLoadingText">홍보글을 생성 중입니다...</p>
+                <p id="coupangLoadingText">분석 중입니다...</p>
               </div>
 
-              <!-- 블로그 홍보글 결과 -->
+              <!-- 블로그 홍보글 -->
               <div class="card result-card" id="coupangBlogResult" style="display:none">
                 <div class="card-title">
                   블로그 홍보글
@@ -165,7 +165,7 @@
                 </div>
               </div>
 
-              <!-- 스레드 결과 -->
+              <!-- 스레드 포스트 -->
               <div class="card result-card" id="coupangThreadsResult" style="display:none">
                 <div class="card-title">
                   스레드 포스트
@@ -176,6 +176,7 @@
                 <div class="threads-list" id="coupangThreadsList"></div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
