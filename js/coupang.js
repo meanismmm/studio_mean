@@ -1,251 +1,209 @@
-// ===== coupang.js — 쿠팡 파트너스 숏츠 =====
+// ===== coupang.js — 쿠팡 파트너스 홍보글 생성 =====
 
-// 카테고리별 검색 키워드 매핑
-const COUPANG_KEYWORDS = {
-  home: ['주방용품', '청소용품', '수납정리', '생활잡화', '욕실용품'],
-  beauty: ['스킨케어', '마스크팩', '선크림', '영양제', '다이어트'],
-  fashion: ['가방', '신발', '패딩', '티셔츠', '액세서리'],
-  digital: ['무선이어폰', '보조배터리', '충전기', '스마트워치', '블루투스스피커'],
-  baby: ['유아식', '기저귀', '장난감', '유모차', '아기옷'],
-  pet: ['사료', '간식', '장난감', '사료그릇', '리드줄'],
-  sports: ['요가매트', '덤벨', '운동화', '자전거', '등산용품'],
-  food: ['건강식품', '간편식', '음료', '과자', '커피']
+const COUPANG_CATEGORY_MAP = {
+  home:    '주방/생활용품',
+  beauty:  '뷰티/건강',
+  fashion: '패션/의류',
+  digital: '디지털/가전',
+  baby:    '유아/아동',
+  pet:     '반려동물',
+  sports:  '스포츠/레저',
+  food:    '식품'
 };
 
-let currentProduct = null;
-
-async function fetchCoupangProduct() {
+async function generateCoupangContent() {
+  const url = document.getElementById('coupangUrl').value.trim();
   const category = document.getElementById('coupangCategory').value;
-  const urlInput = document.getElementById('coupangUrl').value.trim();
-  const btn = document.getElementById('fetchCoupangBtn');
+  const type = document.querySelector('input[name="coupangType"]:checked')?.value || 'blog';
+  const style = document.querySelector('input[name="coupangStyle"]:checked')?.value || 'pain';
 
-  // API 키 확인
-  const accessKey = localStorage.getItem('COUPANG_ACCESS_KEY');
-  const secretKey = localStorage.getItem('COUPANG_SECRET_KEY');
-
-  btn.disabled = true;
-  document.getElementById('productCard').style.display = 'none';
-  document.getElementById('coupangResult').style.display = 'none';
-  setLoading('coupangLoading', true, '상품을 조회 중입니다...');
+  setLoading('coupangLoading', true, url ? '상품 페이지를 분석 중입니다...' : '상품을 구성 중입니다...');
+  document.getElementById('coupangBlogResult').style.display = 'none';
+  document.getElementById('coupangThreadsResult').style.display = 'none';
 
   try {
-    let product;
+    // 상품 정보 획득
+    const product = await getCoupangProduct(url, category);
 
-    if (urlInput) {
-      // URL에서 상품 ID 추출
-      const match = urlInput.match(/products\/(\d+)/);
-      if (!match) throw new Error('올바른 쿠팡 상품 URL을 입력해주세요');
-      product = await fetchProductById(match[1], accessKey, secretKey);
-    } else if (accessKey && secretKey) {
-      // API로 인기 상품 조회
-      product = await fetchTrendingProduct(category, accessKey, secretKey);
-    } else {
-      // API 키 없으면 Claude로 상품 추천
-      product = await fetchProductWithClaude(category);
+    // 생성 유형에 따라 분기
+    if (type === 'blog' || type === 'both') {
+      await generateCoupangBlog(product, style);
     }
-
-    currentProduct = product;
-    renderProductCard(product);
-  } catch (e) {
+    if (type === 'threads' || type === 'both') {
+      await generateCoupangThreads(product, style);
+    }
+  } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
     setLoading('coupangLoading', false);
-    btn.disabled = false;
   }
 }
 
-// 쿠팡 파트너스 API - HMAC 서명 생성
-function generateCoupangSignature(method, url, secretKey, accessKey) {
-  const now = new Date();
-  const datetime = now.toISOString().replace(/[-:]/g, '').slice(0, 13) + 'Z';
-  const message = datetime + method + url;
-  // 브라우저에서는 HMAC 서명이 제한적 — 실 환경에서는 GitHub Actions 백엔드 필요
-  return { datetime, signature: btoa(message + secretKey).slice(0, 32) };
-}
-
-async function fetchTrendingProduct(category, accessKey, secretKey) {
-  const keywords = COUPANG_KEYWORDS[category];
-  const keyword = keywords[Math.floor(Math.random() * keywords.length)];
-
-  // 쿠팡 파트너스 상품 검색 API
-  // 참고: 브라우저에서 직접 호출 시 CORS 이슈가 있을 수 있음
-  // 실제 운영 시 GitHub Actions 또는 프록시 서버 경유 권장
-  try {
-    const path = `/v2/providers/affiliate_open_api/apis/openapi/products/bestcategories/1`;
-    const resp = await fetch(`https://api-gateway.coupang.com${path}`, {
-      headers: {
-        'Authorization': `CEA algorithm=HmacSHA256, access-key=${accessKey}, signed-date=${new Date().toISOString()}, signature=dummy`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (resp.ok) {
-      const data = await resp.json();
-      const item = data.data?.[0];
-      if (item) return formatCoupangItem(item, keyword);
-    }
-  } catch(e) {
-    // API 직접 호출 실패 시 Claude 폴백
+// 상품 정보 획득 (URL 분석 or 카테고리 기반 생성)
+async function getCoupangProduct(url, category) {
+  if (url) {
+    // URL이 있으면 Claude에게 상품 페이지 정보 분석 요청
+    return await analyzeProductUrl(url);
+  } else {
+    // URL 없으면 카테고리 기반으로 상품 구성
+    return await generateProductInfo(category);
   }
-
-  // 폴백: Claude로 상품 추천
-  return await fetchProductWithClaude(category, keyword);
 }
 
-async function fetchProductById(productId, accessKey, secretKey) {
-  return await fetchProductWithClaude('home', `상품ID: ${productId}`);
-}
-
-// Claude를 활용한 상품 추천 (API 없을 때 폴백)
-async function fetchProductWithClaude(category, keyword = '') {
-  const categoryNames = {
-    home:'주방/생활', beauty:'뷰티/건강', fashion:'패션',
-    digital:'디지털/가전', baby:'유아/아동', pet:'반려동물',
-    sports:'스포츠/레저', food:'식품'
-  };
-  const catName = categoryNames[category] || category;
-  const kw = keyword || (COUPANG_KEYWORDS[category] || ['인기'])[0];
-
+async function analyzeProductUrl(url) {
   const result = await callClaude(
-    '당신은 쿠팡 파트너스 마케터입니다. JSON만 반환하세요. 마크다운 없이 순수 JSON만.',
-    `쿠팡에서 인기있는 ${catName} 카테고리의 "${kw}" 관련 실제 상품 하나를 추천해주세요.
+    '당신은 쿠팡 상품 분석 전문가입니다. 반드시 순수 JSON만 반환하세요.',
+    `다음 쿠팡 상품 URL을 보고, URL 구조에서 파악 가능한 정보와 일반적인 쿠팡 상품 패턴을 바탕으로 상품 정보를 구성해주세요.
+URL에서 직접 정보를 가져올 수 없으므로, URL 패턴과 카테고리 추정을 통해 현실적인 상품 정보를 만들어주세요.
+
+URL: ${url}
+
 반드시 아래 JSON 형식으로만 답하세요:
 {
-  "name": "상품명 (구체적이고 실제같은 이름)",
-  "price": "가격 (예: 29,900원)",
-  "category": "${catName}",
-  "keyword": "${kw}",
-  "features": ["특징1", "특징2", "특징3"],
-  "targetAudience": "주요 타겟 (예: 30대 직장인 여성)",
-  "painPoint": "이 상품이 해결하는 문제",
-  "wowPoint": "이 상품의 놀라운 점"
+  "name": "추정 상품명 (구체적이고 현실적인 이름)",
+  "price": "추정 가격대",
+  "category": "카테고리",
+  "features": ["주요 특징1", "주요 특징2", "주요 특징3", "주요 특징4"],
+  "targetAudience": "주요 타겟 고객",
+  "painPoint": "이 상품이 해결하는 핵심 문제",
+  "wowPoint": "이 상품의 가장 놀라운 혜택이나 특징",
+  "pexelsQuery": "이 상품 관련 Pexels 이미지 검색어 (영어 2~3단어)",
+  "affiliateUrl": "${url}"
 }`,
-    500
+    600
+  );
+  return safeParseJSON(result);
+}
+
+async function generateProductInfo(category) {
+  const catName = COUPANG_CATEGORY_MAP[category] || category;
+  const ctx = getTodayContext();
+
+  const result = await callClaude(
+    '당신은 쿠팡 파트너스 마케터입니다. 반드시 순수 JSON만 반환하세요.',
+    `현재 시즌(${ctx.season}, ${ctx.monthlyKeywords})에 쿠팡에서 잘 팔리는 ${catName} 카테고리 인기 상품 하나를 구성해주세요.
+
+반드시 아래 JSON 형식으로만 답하세요:
+{
+  "name": "상품명 (구체적이고 현실적인 이름)",
+  "price": "가격대",
+  "category": "${catName}",
+  "features": ["주요 특징1", "주요 특징2", "주요 특징3", "주요 특징4"],
+  "targetAudience": "주요 타겟 고객",
+  "painPoint": "이 상품이 해결하는 핵심 문제",
+  "wowPoint": "이 상품의 가장 놀라운 혜택이나 특징",
+  "pexelsQuery": "이 상품 관련 Pexels 이미지 검색어 (영어 2~3단어)",
+  "affiliateUrl": "https://link.coupang.com/a/[파트너스링크를_여기에_입력]"
+}`,
+    600
+  );
+  return safeParseJSON(result);
+}
+
+// 블로그 홍보글 생성
+async function generateCoupangBlog(product, style) {
+  const ctx = getTodayContext();
+
+  const styleGuide = style === 'pain'
+    ? `[PAIN형 구조]
+공감되는 문제 상황 제시 → 기존 해결책의 한계 → 이 상품이 완벽한 해결책인 이유 → 구체적 혜택 → 구매 유도`
+    : `[WOW형 구조]
+충격적이거나 놀라운 사실/혜택으로 시작 → 상품의 압도적 특장점 → 실제 사용 효과 → 가성비/가치 강조 → 구매 유도`;
+
+  const result = await callClaude(
+    `당신은 쿠팡 파트너스 블로그 마케터입니다.
+
+${styleGuide}
+
+[글 작성 원칙]
+- 광고처럼 보이지 않게. 진짜 써본 사람처럼 솔직하게.
+- 구체적 수치와 상황 묘사 포함.
+- SEO를 위해 상품명과 카테고리 키워드를 자연스럽게 반복.
+- 쿠팡 파트너스 링크 삽입 위치 명시.
+- 목차 포함, 2000~2500자.
+- ## 소제목 외 마크다운 기호 일절 금지.`,
+    `다음 상품에 대한 ${style === 'pain' ? 'PAIN형' : 'WOW형'} 블로그 홍보글을 작성해주세요.
+
+[상품 정보]
+- 상품명: ${product.name}
+- 가격: ${product.price}
+- 카테고리: ${product.category}
+- 주요 특징: ${(product.features || []).join(', ')}
+- 타겟: ${product.targetAudience || ''}
+- 해결 문제: ${product.painPoint || ''}
+- 핵심 혜택: ${product.wowPoint || ''}
+- 파트너스 링크: ${product.affiliateUrl || '[링크]'}
+
+오늘 날짜: ${ctx.dateStr} / 계절: ${ctx.season}
+
+[구조]
+제목 (SEO 최적화)
+
+[목차]
+1~4개 소제목 나열
+
+본문 (목차 순서대로)
+
+마무리: 구매 권유 + 파트너스 링크 안내
+※ 이 포스팅은 쿠팡 파트너스 활동의 일환으로 수수료를 받을 수 있습니다.`,
+    3000
   );
 
-  const clean = result.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  // 제목 추출 (첫 줄)
+  const lines = result.trim().split('\n');
+  const title = lines[0].replace(/^#*\s*/, '').trim();
+  const body = lines.slice(1).join('\n').trim();
+
+  document.getElementById('coupangBlogTitle').textContent = title;
+  document.getElementById('coupangBlogOutput').textContent = body;
+
+  // Pexels 이미지
+  const query = product.pexelsQuery || `${product.category} product`;
+  await renderPexelsImages(query, 'coupangImageList', 'coupangBlogImages');
+
+  document.getElementById('coupangBlogResult').style.display = 'block';
 }
 
-function renderProductCard(product) {
-  const info = document.getElementById('productInfo');
-  info.innerHTML = `
-    <div class="product-details">
-      <div class="product-name">${product.name}</div>
-      <div class="product-price">${product.price}</div>
-      <div class="product-category">${product.category} · ${product.keyword || ''}</div>
-      ${product.features ? `<div style="margin-top:8px;font-size:11px;color:#7a7a8c">${product.features.join(' · ')}</div>` : ''}
-    </div>
-  `;
-  document.getElementById('productCard').style.display = 'block';
-}
+// 스레드 홍보 포스트 생성
+async function generateCoupangThreads(product, style) {
+  const result = await callClaude(
+    '당신은 스레드(Threads) 쿠팡 파트너스 콘텐츠 전문가입니다. 반드시 순수 JSON만 반환하세요.',
+    `다음 상품에 대한 스레드 홍보 포스트 5개를 작성해주세요.
 
-async function generateCoupangScript() {
-  if (!currentProduct) return;
+[상품 정보]
+- 상품명: ${product.name}
+- 가격: ${product.price}
+- 주요 특징: ${(product.features || []).join(', ')}
+- 핵심 혜택: ${product.wowPoint || ''}
+- 파트너스 링크: ${product.affiliateUrl || '[링크]'}
 
-  const scriptType = document.querySelector('input[name="scriptType"]:checked')?.value || 'PAIN';
-  const btn = document.getElementById('generateScriptBtn');
-  btn.disabled = true;
-  setLoading('coupangLoading', true, '스크립트를 생성 중입니다...');
-  document.getElementById('coupangResult').style.display = 'none';
+[구성]
+1번: 강렬한 훅 (이 상품을 모르면 손해라는 느낌)
+2번: 이런 사람에게 필요한 이유 (공감 유도)
+3번: 핵심 특징 3가지 간결하게
+4번: 가격 대비 가치 강조
+5번: 구매 유도 + 링크 + 해시태그
 
-  try {
-    const systemPrompt = `당신은 유튜브 숏츠 전문 스크립트 작가입니다.
-쿠팡 파트너스 상품 홍보 숏츠를 위한 완성도 높은 스크립트를 작성합니다.
-반드시 지정된 JSON 형식으로만 응답하세요. 마크다운 없이 순수 JSON만.`;
+[규칙]
+- 각 포스트 500자 이내
+- 줄바꿈으로 가독성 확보
+- 광고 티 나지 않게
+- 마지막에 "※ 파트너스 링크 포함" 문구
 
-    const userPrompt = scriptType === 'PAIN'
-      ? `다음 상품에 대한 PAIN형 유튜브 숏츠 스크립트를 작성해주세요.
-PAIN형 = 공감되는 문제 제시 → 해결책으로 상품 소개 → 구매 유도
-
-상품 정보:
-- 이름: ${currentProduct.name}
-- 가격: ${currentProduct.price}
-- 카테고리: ${currentProduct.category}
-- 특징: ${(currentProduct.features || []).join(', ')}
-- 타겟: ${currentProduct.targetAudience || '전 연령'}
-- 해결 문제: ${currentProduct.painPoint || ''}
-
-JSON 형식:
+반드시 순수 JSON으로만:
 {
-  "hook": "첫 3초 훅 문구 (강렬하게)",
-  "scenes": [
-    {"no": 1, "duration": 3, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 2, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 3, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 4, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 5, "duration": 3, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 6, "duration": 3, "visual": "CTA 화면", "caption": "구매 유도 자막", "narration": "CTA 나레이션"}
-  ],
-  "fullNarration": "전체 나레이션 텍스트 (이어서 읽을 수 있게)",
-  "hashtags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
-}`
-      : `다음 상품에 대한 WOW형 유튜브 숏츠 스크립트를 작성해주세요.
-WOW형 = 놀라운 사실/혜택 제시 → 임팩트 강조 → 구매 충동 유발
+  "posts": [
+    {"no": 1, "text": "내용", "type": "hook"},
+    {"no": 2, "text": "내용", "type": "content"},
+    {"no": 3, "text": "내용", "type": "content"},
+    {"no": 4, "text": "내용", "type": "content"},
+    {"no": 5, "text": "내용 + 링크 + 해시태그", "type": "cta"}
+  ]
+}`,
+    1500
+  );
 
-상품 정보:
-- 이름: ${currentProduct.name}
-- 가격: ${currentProduct.price}
-- 카테고리: ${currentProduct.category}
-- 특징: ${(currentProduct.features || []).join(', ')}
-- WOW 포인트: ${currentProduct.wowPoint || ''}
-
-JSON 형식:
-{
-  "hook": "첫 3초 훅 문구 (충격/놀라움)",
-  "scenes": [
-    {"no": 1, "duration": 3, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 2, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 3, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 4, "duration": 4, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 5, "duration": 3, "visual": "화면 설명", "caption": "자막 텍스트", "narration": "나레이션"},
-    {"no": 6, "duration": 3, "visual": "CTA 화면", "caption": "구매 유도 자막", "narration": "CTA 나레이션"}
-  ],
-  "fullNarration": "전체 나레이션 텍스트",
-  "hashtags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
-}`;
-
-    const result = await callClaude(systemPrompt, userPrompt, 1500);
-    const clean = result.replace(/```json|```/g, '').trim();
-    const script = JSON.parse(clean);
-
-    renderCoupangScript(script);
-  } catch (e) {
-    showToast('스크립트 생성 오류: ' + e.message);
-  } finally {
-    setLoading('coupangLoading', false);
-    btn.disabled = false;
-  }
-}
-
-function renderCoupangScript(script) {
-  const output = document.getElementById('coupangScriptOutput');
-
-  let html = `🎬 훅: ${script.hook}\n\n`;
-  html += `${'─'.repeat(40)}\n\n`;
-
-  (script.scenes || []).forEach(s => {
-    html += `[장면 ${s.no}] ${s.duration}초\n`;
-    html += `📸 화면: ${s.visual}\n`;
-    html += `💬 자막: ${s.caption}\n`;
-    html += `🎙 나레이션: ${s.narration}\n\n`;
-  });
-
-  html += `${'─'.repeat(40)}\n`;
-  html += `${(script.hashtags || []).join(' ')}`;
-
-  output.textContent = html;
-
-  // 나레이션
-  const narEl = document.getElementById('coupangNarration');
-  narEl.textContent = script.fullNarration || '';
-  document.getElementById('coupangNarrationBox').style.display = 'block';
-
-  // 파트너스 링크 (실제로는 API에서 받아야 함)
-  const linkBox = document.getElementById('coupangLinkBox');
-  const linkEl = document.getElementById('coupangAffiliateLink');
-  linkEl.textContent = 'https://link.coupang.com/a/[파트너스_링크] — 쿠팡 파트너스 센터에서 복사';
-  linkBox.style.display = 'block';
-
-  document.getElementById('coupangResult').style.display = 'block';
+  const parsed = safeParseJSON(result);
+  renderThreadsPosts(parsed.posts, 'coupangThreadsList');
+  document.getElementById('coupangThreadsResult').style.display = 'block';
 }
