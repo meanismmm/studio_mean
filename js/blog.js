@@ -4,31 +4,27 @@
 const TISTORY_CATEGORY_CONFIG = {
   health: {
     name: '건강·증상',
-    topicStyle: `"~에 좋은 음식 N가지", "~증상 원인과 해결법", "~하면 안 되는 이유" 형태.
-검색량 높은 질환명/증상명 포함. 현재 계절 반영 필수.`,
+    topicExamples: '"간에 좋은 음식 6가지", "혈당 스파이크 증상과 낮추는 법", "춘곤증 극복하는 방법 5가지"',
     postStyle: 'health'
   },
   food: {
     name: '음식·영양',
-    topicStyle: `"~에 좋은 음식", "~먹으면 생기는 변화", "~와 함께 먹으면 안 되는 것" 형태.
-계절 식재료, 영양 정보, 효능 중심. 현재 계절 반영 필수.`,
+    topicExamples: '"마늘 매일 먹으면 생기는 변화 7가지", "봄나물 종류와 효능 정리", "단백질 많은 음식 순위 TOP10"',
     postStyle: 'health'
   },
   living: {
     name: '생활·절약',
-    topicStyle: `"~하는 방법 N가지", "~절약하는 법", "~할 때 주의사항" 형태.
-실생활 밀착 정보, 계절·시즌 이슈 반영 필수.`,
+    topicExamples: '"전기요금 줄이는 방법 10가지", "봄 이불 세탁 방법 완벽 정리", "냉장고 정리 방법과 보관 기간"',
     postStyle: 'info'
   },
   recommend: {
     name: '추천·비교',
-    topicStyle: `"~추천 N가지 솔직 비교", "~vs~ 차이점", "~고르는 법" 형태.
-구체적 제품/서비스 카테고리 포함.`,
+    topicExamples: '"전자담배 추천 4가지 솔직 비교", "공기청정기 고르는 법과 추천 5가지", "혈압계 추천 순위"',
     postStyle: 'recommend'
   },
   issue: {
     name: '시사·이슈',
-    topicStyle: `최근 화제가 되는 사회/정책/생활 이슈. 1인칭 의견 포함.`,
+    topicExamples: '"요즘 건강보험료 오르는 이유", "편의점 도시락이 이렇게까지 발전한 이유", "2026년 최저임금 실질 체감"',
     postStyle: 'essay'
   }
 };
@@ -311,7 +307,8 @@ function renderPsychTopics(topics) {
       <input type="text" id="psychDirectInput" placeholder="주제 직접 입력..."
         style="flex:1;background:#0d0d15;border:1px solid #23232f;border-radius:6px;padding:7px 10px;color:#e8e8f0;font-size:13px;font-family:inherit;outline:none"
         onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v)generatePsychPost(v);}"/>
-      <button class="btn-sm btn-accent" onclick="const v=document.getElementById('psychDirectInput').value.trim();if(v)generatePsychPost(v);">생성</button>
+      <button class="btn-sm btn-accent"
+        onclick="const v=document.getElementById('psychDirectInput').value.trim();if(v)generatePsychPost(v);">생성</button>
     </div>`;
   list.appendChild(directItem);
   document.getElementById('psychTopicCard').style.display = 'block';
@@ -385,9 +382,7 @@ async function generatePsychPost(title) {
     document.getElementById('psychTitleBox').textContent = title;
     document.getElementById('psychOutput').textContent = cleaned;
 
-    // Pexels 이미지
     await renderPexelsImages('mental health therapy calm', 'psychImageList', 'psychImages');
-
     document.getElementById('psychResult').style.display = 'block';
   } catch(e) {
     showToast('오류: ' + e.message);
@@ -400,8 +395,10 @@ async function generatePsychPost(title) {
 // ==================== 티스토리 블로그 ====================
 
 async function recommendTistoryTopics() {
-  const checkboxes = document.querySelectorAll('#tab-tistory .checkbox-group input:checked');
+  // name 속성으로 체크박스 선택 — 더 안정적
+  const checkboxes = document.querySelectorAll('input[name="tistoryCategory"]:checked');
   const categories = Array.from(checkboxes).map(c => c.value);
+
   if (!categories.length) { showToast('카테고리를 선택해주세요'); return; }
 
   setLoading('tistoryLoading', true, '주제를 추천하고 있습니다...');
@@ -411,37 +408,41 @@ async function recommendTistoryTopics() {
   const seed = Math.floor(Math.random() * 10000);
   const ctx = getTodayContext();
 
+  // 카테고리별로 몇 개씩 추천할지 계산
+  const perCat = Math.ceil(5 / categories.length);
+
+  // 각 카테고리별 지시사항 — 예시 포함하여 명확하게 구분
   const catInstructions = categories.map(c => {
     const cfg = TISTORY_CATEGORY_CONFIG[c];
-    return `[${cfg.name}]\n주제 방향: ${cfg.topicStyle}`;
+    return `[${cfg.name}] — 이 카테고리에서 ${perCat}개 추천
+제목 예시: ${cfg.topicExamples}
+반드시 위 예시와 같은 형태의 제목을 만들 것.`;
   }).join('\n\n');
 
   try {
     const result = await callClaude(
       '당신은 티스토리 애드센스 블로그 주제 기획 전문가입니다.',
       `요청번호: ${seed}
-오늘 날짜: ${ctx.dateStr}
-현재 계절: ${ctx.season}
+오늘 날짜: ${ctx.dateStr} / 현재 계절: ${ctx.season}
 이달의 시의성 키워드: ${ctx.monthlyKeywords}
 
-[선택된 카테고리와 주제 방향]
+[카테고리별 주제 추천 지시]
 ${catInstructions}
 
-[주제 추천 규칙]
-- 합산 5개. 카테고리가 여러 개면 고르게 배분.
-- 반드시 현재 계절과 이달 시의성 키워드를 2개 이상 반영할 것.
-- 애드센스 수익에 유리한 검색량 높은 주제 우선.
-- 제목 형태: "~에 좋은 음식 N가지", "~하는 법 N가지", "~추천 N가지", "~원인과 해결법" 중 택일.
-- 현재 계절(${ctx.season})에 맞는 주제만 추천. 계절 맞지 않는 주제 금지.
-- 각 주제 앞에 카테고리 태그 표시.
+[공통 규칙]
+- 합산 5개. 카테고리가 여러 개면 위 지시대로 배분.
+- 현재 계절(${ctx.season})과 시의성 키워드를 반드시 반영.
+- 각 카테고리의 예시 형태에서 절대 벗어나지 말 것.
+- 카테고리를 섞지 말 것. 각 주제는 지정된 카테고리 형태여야 함.
+- 각 주제 앞에 카테고리 태그 표시: [건강·증상], [음식·영양], [생활·절약], [추천·비교], [시사·이슈]
 
 반드시 번호 목록으로만 출력:
-1. [카테고리] 제목
-2. [카테고리] 제목
-3. [카테고리] 제목
-4. [카테고리] 제목
-5. [카테고리] 제목`,
-      600
+1. [카테고리태그] 제목
+2. [카테고리태그] 제목
+3. [카테고리태그] 제목
+4. [카테고리태그] 제목
+5. [카테고리태그] 제목`,
+      700
     );
 
     const lines = result.trim().split('\n').filter(l => l.match(/^\d+\./));
@@ -465,8 +466,11 @@ function renderTistoryTopics(topics, selectedCategories) {
   list.innerHTML = '';
 
   const tagColors = {
-    '건강·증상':'#3ecfb2', '음식·영양':'#f5c842',
-    '생활·절약':'#a78bfa', '추천·비교':'#5b7fff', '시사·이슈':'#ff6b8a'
+    '건강·증상': '#3ecfb2',
+    '음식·영양': '#f5c842',
+    '생활·절약': '#a78bfa',
+    '추천·비교': '#5b7fff',
+    '시사·이슈': '#ff6b8a'
   };
 
   topics.forEach((topic, i) => {
@@ -476,7 +480,9 @@ function renderTistoryTopics(topics, selectedCategories) {
     item.innerHTML = `
       <div class="topic-num">${String(i+1).padStart(2,'0')}</div>
       <div style="flex:1">
-        ${topic.tag ? `<div style="font-size:11px;color:${color};margin-bottom:3px;font-weight:600;font-family:'DM Mono',monospace">${topic.tag}</div>` : ''}
+        ${topic.tag
+          ? `<div style="font-size:11px;color:${color};margin-bottom:3px;font-weight:600;font-family:'DM Mono',monospace">${topic.tag}</div>`
+          : ''}
         <div class="topic-title">${topic.title}</div>
       </div>`;
     item.addEventListener('click', () => generateTistoryPost(topic.title, topic.tag, selectedCategories));
@@ -508,9 +514,13 @@ async function generateTistoryPost(title, tag, selectedCategories) {
 
   const ctx = getTodayContext();
 
+  // 태그 → postStyle 매핑
   const tagToStyle = {
-    '건강·증상':'health', '음식·영양':'health',
-    '생활·절약':'info', '추천·비교':'recommend', '시사·이슈':'essay'
+    '건강·증상': 'health',
+    '음식·영양': 'health',
+    '생활·절약': 'info',
+    '추천·비교': 'recommend',
+    '시사·이슈': 'essay'
   };
 
   let postStyle = 'info';
@@ -519,12 +529,21 @@ async function generateTistoryPost(title, tag, selectedCategories) {
   } else if (selectedCategories && selectedCategories.length === 1) {
     postStyle = TISTORY_CATEGORY_CONFIG[selectedCategories[0]]?.postStyle || 'info';
   } else {
+    // 주제 키워드로 자동 추론
     const lower = title.toLowerCase();
-    if (['추천','비교','순위','고르는','골라','vs'].some(k => lower.includes(k))) postStyle = 'recommend';
+    if (['추천','비교','순위','고르는','vs'].some(k => lower.includes(k)))                            postStyle = 'recommend';
     else if (['증상','질환','건강','치료','예방','음식','영양','효능','다이어트','혈압','혈당','간','면역','비타민','먹으면'].some(k => lower.includes(k))) postStyle = 'health';
-    else if (['방법','하는 법','팁','가이드','정리','총정리','절약','줄이는','이유','차이','종류'].some(k => lower.includes(k))) postStyle = 'info';
-    else if (['왜','민낯','문제','현실','이슈','논란','솔직히'].some(k => lower.includes(k))) postStyle = 'essay';
+    else if (['방법','하는 법','팁','가이드','정리','총정리','절약','줄이는','이유','차이','종류'].some(k => lower.includes(k)))                          postStyle = 'info';
+    else if (['왜','민낯','문제','현실','이슈','논란','솔직히'].some(k => lower.includes(k)))          postStyle = 'essay';
   }
+
+  // Pexels 검색어
+  const pexelsQueryMap = {
+    health:    'healthy food nutrition wellness',
+    info:      'living lifestyle home tips',
+    recommend: 'product review comparison',
+    essay:     'daily life society people'
+  };
 
   try {
     const result = await callClaude(
@@ -535,7 +554,7 @@ async function generateTistoryPost(title, tag, selectedCategories) {
 
 주의사항:
 - 이 주제만 다룰 것. 주제와 무관한 내용 일절 금지.
-- 현재 날짜(${ctx.dateStr}), 계절(${ctx.season})을 자연스럽게 반영할 것.
+- 현재 계절(${ctx.season})을 자연스럽게 반영할 것.
 - 목차를 반드시 글 상단에 포함할 것.
 - 총 분량 준수. 각 소제목 아래 내용이 충분히 채워져야 함.`,
       3500
@@ -544,11 +563,11 @@ async function generateTistoryPost(title, tag, selectedCategories) {
     document.getElementById('tistoryTitleBox').textContent = title;
     document.getElementById('tistoryOutput').textContent = result;
 
-    // Pexels 이미지 — 주제 기반 영어 검색어 생성
-    const pexelsQuery = postStyle === 'health' ? 'healthy food nutrition' :
-                        postStyle === 'recommend' ? 'product review comparison' :
-                        postStyle === 'essay' ? 'lifestyle daily life' : 'living tips lifestyle';
-    await renderPexelsImages(pexelsQuery, 'tistoryImageList', 'tistoryImages');
+    await renderPexelsImages(
+      pexelsQueryMap[postStyle] || 'lifestyle blog',
+      'tistoryImageList',
+      'tistoryImages'
+    );
 
     document.getElementById('tistoryResult').style.display = 'block';
   } catch(e) {
