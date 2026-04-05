@@ -19,7 +19,6 @@
           <span class="logo-text">STUDIO<br><em>MEAN</em></span>
         </div>
       </div>
-
       <ul class="nav-list">
         <li class="nav-item active" data-tab="coupang">
           <span class="nav-icon">🛒</span>
@@ -42,7 +41,6 @@
           <span class="nav-label">설정</span>
         </li>
       </ul>
-
       <div class="sidebar-footer">
         <div class="api-status" id="apiStatus">
           <span class="status-dot" id="statusDot"></span>
@@ -58,21 +56,26 @@
       <section class="tab-panel active" id="tab-coupang">
         <div class="panel-header">
           <h1>쿠팡 파트너스</h1>
-          <p>상품 URL을 분석하고 홍보글과 숏츠 스크립트를 생성합니다</p>
+          <p>상품 정보를 직접 입력하고 홍보글과 스레드 포스트를 생성합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
             <div class="col">
               <div class="card">
-                <div class="card-title">상품 설정</div>
+                <div class="card-title">상품 정보 입력</div>
 
                 <div class="form-group">
-                  <label>상품 URL <span class="optional">(쿠팡 상품 페이지)</span></label>
-                  <input type="text" id="coupangUrl" placeholder="https://www.coupang.com/vp/products/..." />
+                  <label>상품명 <span class="required">*</span></label>
+                  <input type="text" id="coupangProductName" placeholder="예: Kismetic 타공판 책상 선반 DIY 수납선반" />
                 </div>
 
                 <div class="form-group">
-                  <label>카테고리 <span class="optional">(URL 없을 때 사용)</span></label>
+                  <label>가격</label>
+                  <input type="text" id="coupangProductPrice" placeholder="예: 29,900원" />
+                </div>
+
+                <div class="form-group">
+                  <label>카테고리</label>
                   <select id="coupangCategory">
                     <option value="home">주방/생활</option>
                     <option value="beauty">뷰티/건강</option>
@@ -84,6 +87,18 @@
                     <option value="food">식품</option>
                   </select>
                 </div>
+
+                <div class="form-group">
+                  <label>상품 특징 <span class="optional">(줄바꿈으로 구분)</span></label>
+                  <textarea id="coupangProductFeatures" rows="4" placeholder="예: 조립식 DIY 구조&#10;책상 위 공간 활용 극대화&#10;타공판으로 원하는 위치에 부속품 배치&#10;강철 소재로 내구성 우수"></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label>파트너스 링크 <span class="optional">(생성된 글에 삽입)</span></label>
+                  <input type="text" id="coupangAffiliateUrl" placeholder="https://link.coupang.com/a/..." />
+                </div>
+
+                <div class="divider"></div>
 
                 <div class="form-group">
                   <label>생성 유형</label>
@@ -130,7 +145,7 @@
             <div class="col">
               <div class="loading-card" id="coupangLoading" style="display:none">
                 <div class="spinner"></div>
-                <p id="coupangLoadingText">상품을 분석 중입니다...</p>
+                <p id="coupangLoadingText">홍보글을 생성 중입니다...</p>
               </div>
 
               <!-- 블로그 홍보글 결과 -->
@@ -139,6 +154,7 @@
                   블로그 홍보글
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyResult('coupangBlogOutput')">전체 복사</button>
+                    <button class="btn-sm btn-accent" onclick="sendToThreads('coupangBlogOutput', 'coupang')">🧵 스레드로</button>
                   </div>
                 </div>
                 <div class="blog-title-box" id="coupangBlogTitle"></div>
@@ -183,19 +199,16 @@
                   <span>주제 추천 (5개)</span>
                 </button>
               </div>
-
               <div class="card" id="psychTopicCard" style="display:none">
                 <div class="card-title">추천 주제 — 선택하세요</div>
                 <div class="topic-list" id="psychTopicList"></div>
               </div>
             </div>
-
             <div class="col">
               <div class="loading-card" id="psychLoading" style="display:none">
                 <div class="spinner"></div>
                 <p id="psychLoadingText">블로그 글을 작성 중입니다...</p>
               </div>
-
               <div class="card result-card" id="psychResult" style="display:none">
                 <div class="card-title">
                   생성된 블로그 글
@@ -228,32 +241,29 @@
               <div class="card">
                 <div class="card-title">주제 추천</div>
                 <div class="form-group">
-                  <label>카테고리</label>
-                  <div class="checkbox-group">
-                    <label class="check-label"><input type="checkbox" value="health" checked /> 건강·증상</label>
-                    <label class="check-label"><input type="checkbox" value="food" checked /> 음식·영양</label>
-                    <label class="check-label"><input type="checkbox" value="living" /> 생활·절약</label>
-                    <label class="check-label"><input type="checkbox" value="recommend" /> 추천·비교</label>
-                    <label class="check-label"><input type="checkbox" value="issue" /> 시사·이슈</label>
+                  <label>카테고리 선택</label>
+                  <div class="checkbox-group" id="tistoryCategoryGroup">
+                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="health" checked /> 건강·증상</label>
+                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="food" /> 음식·영양</label>
+                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="living" /> 생활·절약</label>
+                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="recommend" /> 추천·비교</label>
+                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="issue" /> 시사·이슈</label>
                   </div>
                 </div>
                 <button class="btn btn-primary" onclick="recommendTistoryTopics()">
                   <span>주제 추천 (5개)</span>
                 </button>
               </div>
-
               <div class="card" id="tistoryTopicCard" style="display:none">
                 <div class="card-title">추천 주제 — 선택하세요</div>
                 <div class="topic-list" id="tistoryTopicList"></div>
               </div>
             </div>
-
             <div class="col">
               <div class="loading-card" id="tistoryLoading" style="display:none">
                 <div class="spinner"></div>
                 <p id="tistoryLoadingText">블로그 글을 작성 중입니다...</p>
               </div>
-
               <div class="card result-card" id="tistoryResult" style="display:none">
                 <div class="card-title">
                   생성된 블로그 글
@@ -285,17 +295,14 @@
             <div class="col">
               <div class="card">
                 <div class="card-title">원본 글</div>
-
                 <div class="form-group">
                   <label>블로그 원본 URL <span class="optional">(선택 — 마지막 포스트에 링크 삽입)</span></label>
                   <input type="text" id="threadsSourceUrl" placeholder="https://blog.naver.com/..." />
                 </div>
-
                 <div class="form-group">
                   <label>블로그 글 붙여넣기</label>
-                  <textarea id="threadsInput" rows="12" placeholder="블로그 글을 여기에 붙여넣으세요.&#10;&#10;정신과 블로그나 티스토리 탭에서 생성한 글을 붙여넣거나,&#10;'스레드로' 버튼을 누르면 자동으로 채워집니다."></textarea>
+                  <textarea id="threadsInput" rows="12" placeholder="블로그 글을 여기에 붙여넣으세요.&#10;&#10;정신과·티스토리 탭에서 '🧵 스레드로' 버튼을 누르면&#10;자동으로 채워집니다."></textarea>
                 </div>
-
                 <div class="form-group">
                   <label>포스트 수</label>
                   <div class="radio-group">
@@ -304,7 +311,6 @@
                     <label class="radio-label"><input type="radio" name="threadsCount" value="10" /> 10개</label>
                   </div>
                 </div>
-
                 <div class="form-group">
                   <label>말투</label>
                   <div class="radio-group">
@@ -313,19 +319,16 @@
                     <label class="radio-label"><input type="radio" name="threadsTone" value="emotional" /> 공감·감성형</label>
                   </div>
                 </div>
-
                 <button class="btn btn-primary" onclick="generateThreads()">
                   <span>스레드 생성</span>
                 </button>
               </div>
             </div>
-
             <div class="col">
               <div class="loading-card" id="threadsLoading" style="display:none">
                 <div class="spinner"></div>
                 <p id="threadsLoadingText">스레드를 생성 중입니다...</p>
               </div>
-
               <div class="card result-card" id="threadsResult" style="display:none">
                 <div class="card-title">
                   생성된 스레드
@@ -358,7 +361,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🖼️ Pexels API</div>
               <div class="form-group">
@@ -369,7 +371,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🛒 쿠팡 파트너스</div>
               <div class="form-group">
@@ -387,7 +388,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🔊 Google Cloud TTS</div>
               <div class="form-group">
@@ -399,7 +399,6 @@
               </div>
             </div>
           </div>
-
           <div class="card" style="margin-top:16px">
             <div class="card-title">저장 상태</div>
             <div class="key-status-grid" id="keyStatusGrid"></div>
