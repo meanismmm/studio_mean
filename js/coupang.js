@@ -1,13 +1,12 @@
 // ===== coupang.js — 쿠팡 파트너스 이미지 분석 + 홍보글 생성 =====
 
 let coupangExtractedProduct = null;
+let coupangImageFiles = []; // 누적 이미지 파일 목록
 
-// ===== 이미지 업로드 UI 처리 =====
+// ===== 초기화 =====
 function initCoupangImageUpload() {
-  const dropzone = document.getElementById('coupangDropzone');
+  const dropzone  = document.getElementById('coupangDropzone');
   const fileInput = document.getElementById('coupangImageInput');
-  const preview   = document.getElementById('coupangImagePreview');
-
   if (!dropzone || !fileInput) return;
 
   // 드래그앤드롭
@@ -19,59 +18,109 @@ function initCoupangImageUpload() {
   dropzone.addEventListener('drop', e => {
     e.preventDefault();
     dropzone.classList.remove('drag-over');
-    handleImageFiles(e.dataTransfer.files);
+    addImageFiles(Array.from(e.dataTransfer.files));
   });
 
   // 클릭 업로드
   dropzone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => handleImageFiles(fileInput.files));
+  fileInput.addEventListener('change', () => {
+    addImageFiles(Array.from(fileInput.files));
+    fileInput.value = ''; // 같은 파일 재선택 가능하게
+  });
+
+  // Ctrl+V 붙여넣기 — 쿠팡 탭이 활성화된 상태에서만
+  document.addEventListener('paste', e => {
+    const activeTab = document.querySelector('.tab-panel.active');
+    if (!activeTab || activeTab.id !== 'tab-coupang') return;
+
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    if (!imageItems.length) return;
+
+    e.preventDefault();
+    const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
+    addImageFiles(files);
+    showToast(`📋 이미지 ${files.length}장 붙여넣기 완료`);
+  });
 }
 
-// 업로드된 이미지 파일 처리
-function handleImageFiles(files) {
+// 이미지 파일 누적 추가
+function addImageFiles(files) {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  if (!imageFiles.length) return;
+
+  // 기존 목록에 누적
+  coupangImageFiles = [...coupangImageFiles, ...imageFiles];
+
+  renderImagePreview();
+  document.getElementById('coupangAnalyzeBtn').style.display = 'block';
+  document.getElementById('coupangExtractResult').style.display = 'none';
+  document.getElementById('coupangOptionsCard').style.display  = 'none';
+  coupangExtractedProduct = null;
+}
+
+// 이미지 미리보기 렌더링
+function renderImagePreview() {
   const preview = document.getElementById('coupangImagePreview');
-  const arr = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 3);
-  if (!arr.length) { showToast('이미지 파일을 선택해주세요 (최대 3장)'); return; }
-
   preview.innerHTML = '';
-  preview.style.display = 'flex';
+  preview.style.display = coupangImageFiles.length ? 'flex' : 'none';
 
-  arr.forEach((file, i) => {
+  coupangImageFiles.forEach((file, i) => {
     const reader = new FileReader();
     reader.onload = e => {
       const div = document.createElement('div');
       div.className = 'image-preview-item';
       div.innerHTML = `
         <img src="${e.target.result}" alt="상품 이미지 ${i+1}" />
-        <span class="preview-badge">${i+1}</span>`;
+        <span class="preview-badge">${i+1}</span>
+        <button class="preview-remove" onclick="removeCoupangImage(${i})" title="삭제">×</button>`;
       preview.appendChild(div);
     };
     reader.readAsDataURL(file);
   });
 
-  // 파일 목록 저장
-  window._coupangFiles = arr;
-  document.getElementById('coupangAnalyzeBtn').style.display = 'block';
-  document.getElementById('coupangExtractResult').style.display = 'none';
+  // 이미지 수 표시 업데이트
+  const countEl = document.getElementById('coupangImageCount');
+  if (countEl) countEl.textContent = `${coupangImageFiles.length}장 업로드됨`;
+}
+
+// 개별 이미지 삭제
+function removeCoupangImage(index) {
+  coupangImageFiles.splice(index, 1);
+  renderImagePreview();
+  if (!coupangImageFiles.length) {
+    document.getElementById('coupangAnalyzeBtn').style.display = 'none';
+  }
+}
+
+// 전체 초기화
+function resetCoupangImages() {
+  coupangImageFiles = [];
   coupangExtractedProduct = null;
+  renderImagePreview();
+  document.getElementById('coupangAnalyzeBtn').style.display    = 'none';
+  document.getElementById('coupangExtractResult').style.display = 'none';
+  document.getElementById('coupangOptionsCard').style.display   = 'none';
+  document.getElementById('coupangBlogResult').style.display    = 'none';
+  document.getElementById('coupangThreadsResult').style.display = 'none';
 }
 
 // ===== 이미지 분석 → 상품 정보 추출 =====
 async function analyzeCoupangImages() {
-  const files = window._coupangFiles;
-  if (!files || !files.length) { showToast('이미지를 먼저 업로드해주세요'); return; }
+  if (!coupangImageFiles.length) { showToast('이미지를 먼저 업로드해주세요'); return; }
 
-  setLoading('coupangLoading', true, '이미지에서 상품 정보를 분석 중입니다...');
+  setLoading('coupangLoading', true, `이미지 ${coupangImageFiles.length}장을 분석 중입니다...`);
   document.getElementById('coupangExtractResult').style.display = 'none';
+  document.getElementById('coupangOptionsCard').style.display   = 'none';
   document.getElementById('coupangBlogResult').style.display    = 'none';
   document.getElementById('coupangThreadsResult').style.display = 'none';
 
   try {
-    // 이미지를 base64로 변환
-    const imageContents = await Promise.all(files.map(f => fileToBase64Content(f)));
-
     const apiKey = localStorage.getItem('CLAUDE_API_KEY');
     if (!apiKey) throw new Error('Claude API 키가 설정되지 않았습니다.');
+
+    // 모든 이미지를 base64로 변환
+    const imageContents = await Promise.all(coupangImageFiles.map(fileToBase64Content));
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -83,27 +132,28 @@ async function analyzeCoupangImages() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: '당신은 쿠팡 상품 상세페이지 분석 전문가입니다. 이미지에서 상품 정보를 추출하여 반드시 순수 JSON만 반환하세요. 마크다운 없이 JSON만.',
+        max_tokens: 1200,
+        system: '당신은 쿠팡 상품 상세페이지 분석 전문가입니다. 이미지들을 종합 분석하여 반드시 순수 JSON만 반환하세요. 마크다운 코드블록 없이 JSON만.',
         messages: [{
           role: 'user',
           content: [
             ...imageContents,
             {
               type: 'text',
-              text: `위 쿠팡 상품 상세페이지 이미지들을 분석해서 상품 정보를 추출해주세요.
+              text: `위 이미지들은 쿠팡 상품 상세페이지 스크린샷입니다.
+이미지 전체를 종합하여 상품 정보를 최대한 정확하게 추출해주세요.
 
 반드시 아래 JSON 형식으로만 답하세요:
 {
-  "name": "상품명 (정확하게)",
+  "name": "상품명 (이미지에서 읽은 정확한 이름)",
   "price": "가격 (이미지에서 읽은 값, 없으면 '미확인')",
-  "brand": "브랜드명 (있는 경우)",
+  "brand": "브랜드명 (있는 경우, 없으면 빈 문자열)",
   "features": ["핵심 특징1", "핵심 특징2", "핵심 특징3", "핵심 특징4", "핵심 특징5"],
   "targetAudience": "주요 타겟 고객 추정",
-  "painPoint": "이 상품이 해결하는 문제",
+  "painPoint": "이 상품이 해결하는 핵심 문제",
   "wowPoint": "가장 강조된 혜택이나 특장점",
   "category": "상품 카테고리 (home/beauty/fashion/digital/baby/pet/sports/food 중 하나)",
-  "pexelsQuery": "이 상품 관련 이미지 검색어 (영어 2~3단어)"
+  "pexelsQuery": "이 상품 관련 Pexels 이미지 검색어 (영어 2~3단어)"
 }`
             }
           ]
@@ -116,12 +166,13 @@ async function analyzeCoupangImages() {
       throw new Error(err.error?.message || `API 오류 (${response.status})`);
     }
 
-    const data = await response.json();
-    const text = data.content[0]?.text || '';
+    const data    = await response.json();
+    const text    = data.content[0]?.text || '';
     const product = safeParseJSON(text);
 
     coupangExtractedProduct = product;
     renderExtractedProduct(product);
+    document.getElementById('coupangOptionsCard').style.display = 'block';
 
   } catch(e) {
     showToast('분석 오류: ' + e.message);
@@ -138,11 +189,7 @@ function fileToBase64Content(file) {
       const base64 = e.target.result.split(',')[1];
       resolve({
         type: 'image',
-        source: {
-          type: 'base64',
-          media_type: file.type,
-          data: base64
-        }
+        source: { type: 'base64', media_type: file.type, data: base64 }
       });
     };
     reader.onerror = reject;
@@ -156,8 +203,8 @@ function renderExtractedProduct(product) {
 
   box.innerHTML = `
     <div class="card-title">
-      추출된 상품 정보
-      <span style="font-size:10px;color:#3ecfb2;font-weight:400">✓ 분석 완료 — 수정 후 홍보글 생성</span>
+      STEP 2 — 추출된 상품 정보 확인 및 수정
+      <span style="font-size:10px;color:#3ecfb2;font-weight:400">✓ 분석 완료</span>
     </div>
 
     <div class="form-group">
@@ -176,7 +223,7 @@ function renderExtractedProduct(product) {
     </div>
 
     <div class="form-group">
-      <label>핵심 특징 <span class="optional">(줄바꿈으로 구분)</span></label>
+      <label>핵심 특징 <span class="optional">(줄바꿈으로 구분, 수정 가능)</span></label>
       <textarea id="ep_features" rows="5">${(product.features || []).join('\n')}</textarea>
     </div>
 
@@ -205,18 +252,19 @@ function renderExtractedProduct(product) {
 }
 
 function escapeAttr(str) {
-  return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-// ===== 홍보글 생성 (추출된 정보 기반) =====
+// ===== 홍보글 생성 =====
 async function generateCoupangContent() {
-  // 이미지 분석 결과가 없으면 먼저 분석 유도
   if (!coupangExtractedProduct) {
     showToast('먼저 이미지를 업로드하고 [상품 정보 분석] 버튼을 눌러주세요');
     return;
   }
 
-  // 편집된 필드값 수집
   const product = {
     name:           document.getElementById('ep_name')?.value.trim()     || coupangExtractedProduct.name,
     brand:          document.getElementById('ep_brand')?.value.trim()    || '',
@@ -226,7 +274,7 @@ async function generateCoupangContent() {
     painPoint:      document.getElementById('ep_pain')?.value.trim()     || '',
     wowPoint:       document.getElementById('ep_wow')?.value.trim()      || '',
     affiliateUrl:   document.getElementById('ep_url')?.value.trim()      || '[파트너스 링크를 여기에 입력]',
-    category:       coupangExtractedProduct.category || 'home',
+    category:       coupangExtractedProduct.category  || 'home',
     pexelsQuery:    coupangExtractedProduct.pexelsQuery || 'product lifestyle'
   };
 
@@ -240,12 +288,8 @@ async function generateCoupangContent() {
   document.getElementById('coupangThreadsResult').style.display = 'none';
 
   try {
-    if (type === 'blog' || type === 'both') {
-      await generateCoupangBlog(product, style);
-    }
-    if (type === 'threads' || type === 'both') {
-      await generateCoupangThreads(product, style);
-    }
+    if (type === 'blog' || type === 'both') await generateCoupangBlog(product, style);
+    if (type === 'threads' || type === 'both') await generateCoupangThreads(product, style);
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
@@ -256,12 +300,9 @@ async function generateCoupangContent() {
 // ===== 블로그 홍보글 =====
 async function generateCoupangBlog(product, style) {
   const ctx = getTodayContext();
-
   const styleGuide = style === 'pain'
-    ? `[PAIN형]
-공감되는 문제 상황 제시 → 기존 해결책의 한계 → 이 상품이 완벽한 해결책인 이유 → 구체적 혜택 → 구매 유도`
-    : `[WOW형]
-충격적이거나 놀라운 사실/혜택으로 시작 → 압도적 특장점 → 실제 사용 효과 → 가성비/가치 강조 → 구매 유도`;
+    ? `[PAIN형] 공감되는 문제 제시 → 기존 해결책 한계 → 이 상품이 해결책인 이유 → 구체적 혜택 → 구매 유도`
+    : `[WOW형] 놀라운 사실/혜택으로 시작 → 압도적 특장점 → 실제 효과 → 가성비 강조 → 구매 유도`;
 
   const featuresText = product.features.length
     ? product.features.map((f, i) => `${i+1}. ${f}`).join('\n')
@@ -269,20 +310,11 @@ async function generateCoupangBlog(product, style) {
 
   const result = await callClaude(
     `당신은 쿠팡 파트너스 블로그 마케터입니다.
-
 ${styleGuide}
-
-[원칙]
-- 광고처럼 보이지 않게. 진짜 써본 사람처럼 솔직하게.
-- 구체적 수치와 상황 묘사 포함.
-- SEO를 위해 상품명 키워드를 자연스럽게 반복.
-- 목차 포함, 총 2000~2500자.
-- ## 소제목 외 마크다운 기호 일절 금지.
-- 글 마지막에 파트너스 링크 안내 + 수수료 고지 문구.`,
+[원칙] 광고처럼 보이지 않게. 진짜 써본 사람처럼 솔직하게. 구체적 수치와 상황 묘사 포함. SEO를 위해 상품명 키워드 자연스럽게 반복. 목차 포함, 총 2000~2500자. ## 소제목 외 마크다운 기호 일절 금지. 글 마지막에 파트너스 링크 안내 + 수수료 고지 문구.`,
     `[상품 정보]
 상품명: ${product.name}${product.brand ? ` (${product.brand})` : ''}
 가격: ${product.price}
-카테고리: ${product.category}
 핵심 특징:
 ${featuresText}
 타겟: ${product.targetAudience}
@@ -295,14 +327,11 @@ ${featuresText}
 첫 줄: SEO 최적화 제목 (상품명 포함)
 빈 줄
 [목차]
-1. 소제목1
-2. 소제목2
-3. 소제목3
-4. 소제목4
+1~4개 소제목
 
-본문 (목차 순서대로 ## 소제목 사용)
+본문 (## 소제목 사용)
 
-마무리: 구매 권유 + 파트너스 링크 안내
+마무리: 구매 권유 + 파트너스 링크
 ※ 이 포스팅은 쿠팡 파트너스 활동의 일환으로, 일정액의 수수료를 제공받을 수 있습니다.`,
     3000
   );
@@ -313,7 +342,6 @@ ${featuresText}
 
   document.getElementById('coupangBlogTitle').textContent  = title;
   document.getElementById('coupangBlogOutput').textContent = body;
-
   await renderPexelsImages(product.pexelsQuery, 'coupangImageList', 'coupangBlogImages');
   document.getElementById('coupangBlogResult').style.display = 'block';
 }
@@ -332,18 +360,15 @@ async function generateCoupangThreads(product, style) {
 홍보 스타일: ${style === 'pain' ? 'PAIN형' : 'WOW형'}
 
 [포스트 구성]
-1번: 강렬한 훅 — 스크롤 멈추게 만드는 첫 줄
-2번: 이런 사람에게 필요한 이유 (공감 유도)
-3번: 핵심 특징 3가지 — 줄바꿈으로 간결하게
-4번: 가격 대비 가치 강조
+1번: 강렬한 훅
+2번: 이런 사람에게 필요한 이유
+3번: 핵심 특징 3가지
+4번: 가격 대비 가치
 5번: 구매 유도 + 링크 + 해시태그 5개
 
-[규칙]
-- 각 포스트 500자 이내, 줄바꿈 활용
-- 광고 티 나지 않게, 솔직한 어조
-- 5번 마지막에 "※ 파트너스 링크 포함" 문구
+[규칙] 각 포스트 500자 이내. 줄바꿈 활용. 광고 티 나지 않게. 5번 마지막에 "※ 파트너스 링크 포함"
 
-순수 JSON으로만:
+순수 JSON:
 {
   "posts": [
     {"no": 1, "text": "내용", "type": "hook"},
