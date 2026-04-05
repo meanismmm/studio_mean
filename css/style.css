@@ -748,3 +748,24 @@ select option { background: var(--bg-card); }
   color: var(--rose);
   font-size: 11px;
 }
+
+/* 이미지 미리보기 삭제 버튼 */
+.preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.preview-remove:hover { background: var(--rose); }
