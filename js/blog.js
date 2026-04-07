@@ -24,7 +24,7 @@ const TISTORY_CATEGORY_CONFIG = {
   },
   issue: {
     name: '시사·이슈',
-    topicExamples: '"요즘 건강보험료 오르는 이유", "편의점 도시락이 이렇게까지 발전한 이유", "2026년 최저임금 실질 체감"',
+    topicExamples: '"청년들이 결혼을 포기하는 진짜 이유", "한국 사회에서 고독사가 늘어나는 구조적 원인", "SNS가 청소년 자존감에 미치는 영향", "워라밸을 추구할수록 더 불안해지는 이유", "학벌 사회가 여전히 유지되는 메커니즘"',
     postStyle: 'essay'
   }
 };
@@ -444,10 +444,20 @@ async function recommendTistoryTopics() {
 
   const seed = Math.floor(Math.random() * 10000);
   const ctx = getTodayContext();
-  const perCat = Math.ceil(5 / categories.length);
+
+  const isIssueOnly = categories.length === 1 && categories[0] === 'issue';
+  const totalCount = isIssueOnly ? 10 : Math.ceil(5 / categories.length) * categories.length;
+  const perCat = isIssueOnly ? 10 : Math.ceil(5 / categories.length);
 
   const catInstructions = categories.map(c => {
     const cfg = TISTORY_CATEGORY_CONFIG[c];
+    if (c === 'issue') {
+      return `[시사·이슈] — 이 카테고리에서 ${perCat}개 추천
+다양한 관점(경제적, 사회문화적, 심리학적, 세대론적, 구조적 원인 등)에서 한국 사회의 깊이 있는 문제·현상을 다룰 것.
+시의성 있는 단발성 뉴스가 아니라, 오랫동안 공감받을 수 있는 구조적 사회 문제나 현상을 선택할 것.
+제목 예시: ${cfg.topicExamples}
+각 주제는 서로 다른 사회 영역(가족/노동/교육/소비/젠더/고령화/디지털 등)에서 고르게 분산할 것.`;
+    }
     return `[${cfg.name}] — 이 카테고리에서 ${perCat}개 추천
 제목 예시: ${cfg.topicExamples}
 반드시 위 예시와 같은 형태의 제목을 만들 것.`;
@@ -464,19 +474,15 @@ async function recommendTistoryTopics() {
 ${catInstructions}
 
 [공통 규칙]
-- 합산 5개. 카테고리가 여러 개면 위 지시대로 배분.
-- 현재 계절(${ctx.season})과 시의성 키워드를 반드시 반영.
+- 합산 ${totalCount}개. 카테고리가 여러 개면 위 지시대로 배분.
 - 각 카테고리의 예시 형태에서 절대 벗어나지 말 것.
 - 카테고리를 섞지 말 것.
 - 각 주제 앞에 카테고리 태그 표시: [건강·증상], [음식·영양], [생활·절약], [추천·비교], [시사·이슈]
+${isIssueOnly ? '- 시사·이슈 10개는 반드시 서로 다른 사회 영역에서 고르게 분산할 것.' : '- 현재 계절(' + ctx.season + ')과 시의성 키워드를 반드시 반영.'}
 
 반드시 번호 목록으로만 출력:
-1. [카테고리태그] 제목
-2. [카테고리태그] 제목
-3. [카테고리태그] 제목
-4. [카테고리태그] 제목
-5. [카테고리태그] 제목`,
-      700
+${Array.from({length: totalCount}, (_, i) => `${i+1}. [카테고리태그] 제목`).join('\n')}`,
+      isIssueOnly ? 1200 : 700
     );
 
     const lines = result.trim().split('\n').filter(l => l.match(/^\d+\./));
