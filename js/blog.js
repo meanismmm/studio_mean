@@ -29,19 +29,97 @@ const TISTORY_CATEGORY_CONFIG = {
   }
 };
 
+// ===== 웹 검색으로 기존 글 패턴 분석 =====
+async function analyzeExistingContent(title) {
+  const apiKey = localStorage.getItem('CLAUDE_API_KEY');
+  if (!apiKey) throw new Error('Claude API 키가 설정되지 않았습니다.');
+
+  // 검색 도구를 써서 기존 상위 글 패턴 파악
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      tools: [{
+        type: 'web_search_20250305',
+        name: 'web_search'
+      }],
+      system: `당신은 블로그 콘텐츠 차별화 전략가입니다.
+주어진 주제로 검색해서 상위에 노출된 글들의 패턴을 분석하고,
+반드시 순수 JSON만 반환하세요.`,
+      messages: [{
+        role: 'user',
+        content: `"${title}" 주제로 검색해서 상위 블로그 글 3~5개를 분석하세요.
+
+분석 후 반드시 아래 JSON 형식으로만 답하세요:
+{
+  "commonStructure": "상위 글들이 공통으로 쓰는 소제목 구조나 전개 방식 (예: 원인→증상→해결책 순서)",
+  "overusedNumbers": ["반복되는 수치들 (예: 2주에 1번, 26도, 30% 절약 등)"],
+  "overusedTips": ["여러 글에서 반복되는 팁이나 조언들"],
+  "overusedPhrases": ["자주 등장하는 상투적 표현들"],
+  "unusedAngles": ["아직 다뤄지지 않은 각도나 관점 (차별화 포인트)"],
+  "differentStructure": "위 글들과 다르게 가져갈 수 있는 구조 제안"
+}`
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API 오류 (${response.status})`);
+  }
+
+  const data = await response.json();
+
+  // 응답에서 텍스트 블록 추출
+  const textBlock = data.content?.find(b => b.type === 'text');
+  if (!textBlock?.text) {
+    // 검색 결과가 없거나 실패 시 기본값 반환
+    return {
+      commonStructure: '일반적인 원인→방법→효과 구조',
+      overusedNumbers: [],
+      overusedTips: [],
+      overusedPhrases: [],
+      unusedAngles: ['개인 경험 중심', '실패 사례 포함', '비용/시간 현실적 계산'],
+      differentStructure: '역순 구조 또는 Q&A 형식'
+    };
+  }
+
+  try {
+    return safeParseJSON(textBlock.text);
+  } catch(e) {
+    return {
+      commonStructure: textBlock.text.slice(0, 200),
+      overusedNumbers: [],
+      overusedTips: [],
+      overusedPhrases: [],
+      unusedAngles: ['개인 경험 중심', '실패 사례 포함'],
+      differentStructure: '차별화된 구조'
+    };
+  }
+}
+
+// ===== 티스토리 시스템 프롬프트 =====
 const TISTORY_SYSTEM = {
   health: `당신은 건강·음식 정보 티스토리 블로그 작가입니다.
 
-[원칙]
-- 주제에서 절대 이탈하지 않는다.
-- 독자가 끝까지 읽도록 각 소제목 첫 문장에 "왜 이게 중요한지"를 먼저 제시한다.
-- 구체적 수치, 사례, 식품명/성분명을 반드시 포함한다. 뭉뚱그리는 표현 금지.
+[핵심 원칙 — 차별화 필수]
+- 인터넷에 이미 넘쳐나는 일반론 절대 금지. "2주에 한 번", "충분한 수분 섭취" 같은 뻔한 말 하지 마라.
+- 독자가 "이건 다른 데서 못 읽은 내용이다"라고 느껴야 한다.
+- 구체적 수치는 반드시 "왜 그 수치인지" 메커니즘까지 설명한다. 수치만 나열 금지.
+- 반박 포인트 포함: "흔히 알려진 것과 달리~", "실제로는~" 식의 전환이 1개 이상 있어야 한다.
 - 현재 계절과 시의성을 자연스럽게 반영한다.
 
 [톤앤매너]
 - 1인칭. "이게 궁금해서 직접 찾아봤는데" 식의 친근한 구어체.
-- 단언체: "~다", "~해야 한다", "~하면 안 된다".
-- 공포 조장 금지. "알면 예방할 수 있다"는 희망적 프레이밍.
+- 단언체: "~다", "~해야 한다".
+- 공포 조장 금지. 희망적 프레이밍.
 
 [구조 - 반드시 이 순서 준수]
 
@@ -52,52 +130,52 @@ const TISTORY_SYSTEM = {
 4. (소제목4)
 5. (소제목5)
 
-서론: 독자의 궁금증을 한 번에 포착하는 도입. 구체적 수치나 사례로 시작. 180~220자.
+서론: 독자가 이미 알고 있다고 착각하는 것에 균열을 내는 도입. 180~220자.
 
 (사진)
 
 ## (소제목1)
-본문 320~400자. 구체적 수치·식품명·성분명 포함. 왜 그런지 이유까지 설명.
+320~400자. 수치의 메커니즘까지 설명. 왜 그런지 원리 포함.
 
 (사진)
 
 ## (소제목2)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목3)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목4)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목5)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 [정리]
-"결국 이것만 기억하면 된다" 형식으로 핵심 3줄 요약.
+"결국 이것만 기억하면 된다" 형식으로 핵심 3줄 요약. 뻔한 말 금지.
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   info: `당신은 생활정보 티스토리 블로그 작가입니다.
 
-[원칙]
-- 주제에서 절대 이탈하지 않는다.
-- 읽는 사람이 실제로 써먹을 수 있는 정보만 담는다.
-- 각 항목은 "왜 그런지"까지 설명한다. 단순 나열 절대 금지.
+[핵심 원칙 — 차별화 필수]
+- 인터넷에서 복붙되는 팁 목록 절대 금지. 읽는 사람이 "이건 다르다"고 느껴야 한다.
+- 각 항목은 단순 방법 나열이 아니라 "왜 대부분의 사람이 이걸 잘못 알고 있는지"부터 시작한다.
+- 역발상, 실패 경험, 비용/시간의 현실적 계산 중 하나 이상 포함.
 - 현재 계절과 시의성을 자연스럽게 반영한다.
 
 [톤앤매너]
-- 1인칭. 직접 해보거나 찾아본 사람처럼 씀.
-- "~카더라" 금지. "~다", "~해라" 단언체.
-- 시니컬한 구어체이되 정보 밀도 높게.
+- 1인칭. 직접 해보거나 찾아본 사람처럼.
+- 단언체. 시니컬한 구어체이되 정보 밀도 높게.
+- "~카더라" 금지.
 
 [구조 - 반드시 이 순서 준수]
 
@@ -108,51 +186,51 @@ const TISTORY_SYSTEM = {
 4. (소제목4)
 5. (소제목5)
 
-서론: 왜 이 정보가 지금 필요한지 한 방에 설득. 180~220자.
+서론: 왜 기존에 알던 방식이 틀렸거나 부족한지 한 방에 설득. 180~220자.
 
 (사진)
 
 ## (소제목1)
-본문 320~400자. 구체적 방법/수치/예시 포함. 이유까지 설명.
+320~400자. 단순 방법이 아닌 원리와 현실적 맥락 포함.
 
 (사진)
 
 ## (소제목2)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목3)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목4)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 ## (소제목5)
-본문 320~400자.
+320~400자.
 
 (사진)
 
 [한 줄 정리]
-핵심 한 줄로 끊음.
+핵심 한 줄로 끊음. 뻔하지 않게.
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   recommend: `당신은 추천·비교 콘텐츠 티스토리 블로그 작가입니다.
 
-[원칙]
-- 주제(추천 대상)에서 절대 이탈하지 않는다.
-- 광고 같은 말투 절대 금지. 장단점 모두 써야 신뢰가 생긴다.
-- 각 항목마다 "이런 사람에게 맞다/안 맞다"를 명시한다.
-- 구체적 수치, 가격대, 제품/브랜드 카테고리명 반드시 포함.
+[핵심 원칙 — 차별화 필수]
+- 광고 같은 말투, "가성비 최고", "강력 추천" 같은 표현 절대 금지.
+- 단점을 솔직하게 쓰되 "그래도 이런 사람에게는 이게 맞다"는 식으로 정리한다.
+- 가격 대비 현실적 판단 포함. 비싼 게 항상 낫지 않다는 관점 유지.
+- 구체적 수치, 가격대, 브랜드/제품 카테고리 반드시 포함.
 
 [톤앤매너]
 - 1인칭. 직접 써봤거나 꼼꼼히 비교해본 사람의 시점.
-- 단언체. "이게 낫다", "이건 별로다"를 솔직하게.
+- 단언체. "이게 낫다", "이건 별로다" 솔직하게.
 
 [구조 - 반드시 이 순서 준수]
 
@@ -164,78 +242,41 @@ const TISTORY_SYSTEM = {
 5. (추천항목4)
 6. 유형별 최종 추천 요약
 
-서론: 이 카테고리에서 뭘 봐야 하는지 핵심 기준 제시. 180~220자.
+서론: 180~220자.
 
 (사진)
 
 ## 고르기 전에 알아야 할 핵심 기준
-선택 기준 2~3가지. 왜 이 기준이 중요한지 설명. 280~320자.
+280~320자.
 
 (사진)
 
-## (추천항목1)
-특징, 장점, 단점, 가격대, 추천 대상 명시. 320~380자.
-
-(사진)
-
-## (추천항목2)
-320~380자.
-
-(사진)
-
-## (추천항목3)
-320~380자.
-
-(사진)
-
-## (추천항목4)
-320~380자.
+## (추천항목1~4)
+각 320~380자. 특징, 장단점, 가격대, 추천 대상 명시.
 
 (사진)
 
 ## 유형별 최종 추천 요약
-"예산이 적다면 ~, 성능이 중요하다면 ~" 식으로 타입별 요약. 200자 내외.
+200자 내외.
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   essay: `당신은 티스토리 개인 블로그 작가입니다.
 
-[톤앤매너]
+[톤앤매너 샘플]
 샘플1: "분명하게 말하지만, 이 글은 나태하게 살라는 말을 하려는 것은 아니다. 갓생이든 뭐든 무언가에 몰입하고 어제보다 나은 상태를 지향하는 행동은 인간을 인간답게 만드는 훌륭한 동력이다."
 샘플2: "인생은 엑셀 시트가 아니다. 독서의 가치는 읽은 페이지 수가 아니라 그 안의 문장이 내 삶에 어떤 균열을 냈느냐에 있다."
 
 - 1인칭. 자기 생각을 직설적으로 밀어붙임.
-- 시니컬하되 히스테릭하지 않음. 냉소적이지만 설득력 있음.
-- 구어체이되 문장력 있음. 억지 유머 금지. 마무리는 짧게 끊음.
+- 시니컬하되 히스테릭하지 않음. 억지 유머 금지. 마무리는 짧게 끊음.
 - 현재 날짜/계절/시의성을 자연스럽게 반영.
 
-[구조 - 반드시 이 순서 준수]
+[구조]
 
 [목차]
-1. (소제목1)
-2. (소제목2)
-3. (소제목3)
+1~3개 소제목
 
-서론: 주제를 직설적으로 던지는 첫 문단. 150자 내외.
-
-(사진)
-
-## (소제목1)
-280~350자.
-
-(사진)
-
-## (소제목2)
-280~350자.
-
-(사진)
-
-## (소제목3)
-280~350자.
-
-(사진)
-
-마무리: 짧고 강하게 끊음. 100자 이내.
+서론 150자 내외 → ## 소제목별 280~350자 → 마무리 100자 이내
 
 총 1500~2000자. ## 소제목 외 마크다운 기호 일절 금지.`
 };
@@ -297,7 +338,6 @@ function renderPsychTopics(topics) {
     list.appendChild(item);
   });
 
-  // 직접 입력
   const directItem = document.createElement('div');
   directItem.className = 'topic-item';
   directItem.style.borderStyle = 'dashed';
@@ -330,7 +370,7 @@ async function generatePsychPost(title) {
 - 소제목 없음. 구분점 없음. 번호 없음. 마크다운 없음. 별표 없음
 - 수필처럼 문단이 자연스럽게 이어지는 완성된 글
 - 비유와 은유 풍부하게. 전문용어는 쉽게 풀어서.
-- 매번 새로운 도입부. 유사문서 절대 금지.
+- 매번 새로운 도입부. 인터넷에 이미 있는 글과 같은 도입부 절대 금지.
 
 [문단 구성 - 반드시 이 순서 준수. 순수 텍스트만.]
 제목 (SEO 최적화, 인천 가로수 정신건강의학과 포함)
@@ -365,7 +405,7 @@ async function generatePsychPost(title) {
 
 인천 가로수 정신건강의학과 이성철 원장
 
-총 1500~1800자. 순수 텍스트만. 별표 샵 대시 등 마크다운 기호 절대 사용 금지.`,
+총 1500~1800자. 순수 텍스트만. 마크다운 기호 절대 금지.`,
       `다음 주제로 위 형식과 톤앤매너에 맞게 작성해주세요: ${title}`,
       2500
     );
@@ -381,7 +421,6 @@ async function generatePsychPost(title) {
 
     document.getElementById('psychTitleBox').textContent = title;
     document.getElementById('psychOutput').textContent = cleaned;
-
     await renderPexelsImages('mental health therapy calm', 'psychImageList', 'psychImages');
     document.getElementById('psychResult').style.display = 'block';
   } catch(e) {
@@ -395,10 +434,8 @@ async function generatePsychPost(title) {
 // ==================== 티스토리 블로그 ====================
 
 async function recommendTistoryTopics() {
-  // name 속성으로 체크박스 선택 — 더 안정적
   const checkboxes = document.querySelectorAll('input[name="tistoryCategory"]:checked');
   const categories = Array.from(checkboxes).map(c => c.value);
-
   if (!categories.length) { showToast('카테고리를 선택해주세요'); return; }
 
   setLoading('tistoryLoading', true, '주제를 추천하고 있습니다...');
@@ -407,11 +444,8 @@ async function recommendTistoryTopics() {
 
   const seed = Math.floor(Math.random() * 10000);
   const ctx = getTodayContext();
-
-  // 카테고리별로 몇 개씩 추천할지 계산
   const perCat = Math.ceil(5 / categories.length);
 
-  // 각 카테고리별 지시사항 — 예시 포함하여 명확하게 구분
   const catInstructions = categories.map(c => {
     const cfg = TISTORY_CATEGORY_CONFIG[c];
     return `[${cfg.name}] — 이 카테고리에서 ${perCat}개 추천
@@ -433,7 +467,7 @@ ${catInstructions}
 - 합산 5개. 카테고리가 여러 개면 위 지시대로 배분.
 - 현재 계절(${ctx.season})과 시의성 키워드를 반드시 반영.
 - 각 카테고리의 예시 형태에서 절대 벗어나지 말 것.
-- 카테고리를 섞지 말 것. 각 주제는 지정된 카테고리 형태여야 함.
+- 카테고리를 섞지 말 것.
 - 각 주제 앞에 카테고리 태그 표시: [건강·증상], [음식·영양], [생활·절약], [추천·비교], [시사·이슈]
 
 반드시 번호 목록으로만 출력:
@@ -466,11 +500,8 @@ function renderTistoryTopics(topics, selectedCategories) {
   list.innerHTML = '';
 
   const tagColors = {
-    '건강·증상': '#3ecfb2',
-    '음식·영양': '#f5c842',
-    '생활·절약': '#a78bfa',
-    '추천·비교': '#5b7fff',
-    '시사·이슈': '#ff6b8a'
+    '건강·증상': '#3ecfb2', '음식·영양': '#f5c842',
+    '생활·절약': '#a78bfa', '추천·비교': '#5b7fff', '시사·이슈': '#ff6b8a'
   };
 
   topics.forEach((topic, i) => {
@@ -480,16 +511,13 @@ function renderTistoryTopics(topics, selectedCategories) {
     item.innerHTML = `
       <div class="topic-num">${String(i+1).padStart(2,'0')}</div>
       <div style="flex:1">
-        ${topic.tag
-          ? `<div style="font-size:11px;color:${color};margin-bottom:3px;font-weight:600;font-family:'DM Mono',monospace">${topic.tag}</div>`
-          : ''}
+        ${topic.tag ? `<div style="font-size:11px;color:${color};margin-bottom:3px;font-weight:600;font-family:'DM Mono',monospace">${topic.tag}</div>` : ''}
         <div class="topic-title">${topic.title}</div>
       </div>`;
     item.addEventListener('click', () => generateTistoryPost(topic.title, topic.tag, selectedCategories));
     list.appendChild(item);
   });
 
-  // 직접 입력
   const directItem = document.createElement('div');
   directItem.className = 'topic-item';
   directItem.style.borderStyle = 'dashed';
@@ -509,18 +537,11 @@ function renderTistoryTopics(topics, selectedCategories) {
 }
 
 async function generateTistoryPost(title, tag, selectedCategories) {
-  setLoading('tistoryLoading', true, '블로그 글을 작성 중입니다...');
-  document.getElementById('tistoryResult').style.display = 'none';
-
   const ctx = getTodayContext();
 
-  // 태그 → postStyle 매핑
   const tagToStyle = {
-    '건강·증상': 'health',
-    '음식·영양': 'health',
-    '생활·절약': 'info',
-    '추천·비교': 'recommend',
-    '시사·이슈': 'essay'
+    '건강·증상': 'health', '음식·영양': 'health',
+    '생활·절약': 'info', '추천·비교': 'recommend', '시사·이슈': 'essay'
   };
 
   let postStyle = 'info';
@@ -529,34 +550,68 @@ async function generateTistoryPost(title, tag, selectedCategories) {
   } else if (selectedCategories && selectedCategories.length === 1) {
     postStyle = TISTORY_CATEGORY_CONFIG[selectedCategories[0]]?.postStyle || 'info';
   } else {
-    // 주제 키워드로 자동 추론
     const lower = title.toLowerCase();
-    if (['추천','비교','순위','고르는','vs'].some(k => lower.includes(k)))                            postStyle = 'recommend';
+    if (['추천','비교','순위','고르는','vs'].some(k => lower.includes(k))) postStyle = 'recommend';
     else if (['증상','질환','건강','치료','예방','음식','영양','효능','다이어트','혈압','혈당','간','면역','비타민','먹으면'].some(k => lower.includes(k))) postStyle = 'health';
-    else if (['방법','하는 법','팁','가이드','정리','총정리','절약','줄이는','이유','차이','종류'].some(k => lower.includes(k)))                          postStyle = 'info';
-    else if (['왜','민낯','문제','현실','이슈','논란','솔직히'].some(k => lower.includes(k)))          postStyle = 'essay';
+    else if (['방법','하는 법','팁','가이드','정리','총정리','절약','줄이는','이유','차이','종류'].some(k => lower.includes(k))) postStyle = 'info';
+    else if (['왜','민낯','문제','현실','이슈','논란','솔직히'].some(k => lower.includes(k))) postStyle = 'essay';
   }
 
-  // Pexels 검색어
   const pexelsQueryMap = {
-    health:    'healthy food nutrition wellness',
-    info:      'living lifestyle home tips',
+    health: 'healthy food nutrition wellness',
+    info:   'living lifestyle home tips',
     recommend: 'product review comparison',
-    essay:     'daily life society people'
+    essay:  'daily life society people'
   };
+
+  // ===== STEP 1: 기존 글 패턴 분석 =====
+  setLoading('tistoryLoading', true, '기존 글 패턴 분석 중...');
+  document.getElementById('tistoryResult').style.display = 'none';
+
+  let patternAnalysis = null;
+  try {
+    patternAnalysis = await analyzeExistingContent(title);
+  } catch(e) {
+    // 분석 실패해도 글 생성은 계속
+    console.warn('패턴 분석 실패, 기본값으로 진행:', e.message);
+  }
+
+  // ===== STEP 2: 분석 결과 기반 차별화 지시 생성 =====
+  let differentiationGuide = '';
+  if (patternAnalysis) {
+    differentiationGuide = `
+[차별화 필수 지시 — 검색 분석 결과]
+기존 상위 글들의 공통 구조: ${patternAnalysis.commonStructure || '없음'}
+
+아래 항목들은 이미 다른 블로그에 넘쳐나므로 절대 그대로 쓰지 마라:
+- 반복 수치: ${(patternAnalysis.overusedNumbers || []).join(', ') || '없음'}
+- 반복 팁: ${(patternAnalysis.overusedTips || []).join(', ') || '없음'}
+- 상투적 표현: ${(patternAnalysis.overusedPhrases || []).join(', ') || '없음'}
+
+대신 이 각도로 차별화하라:
+- 미개척 관점: ${(patternAnalysis.unusedAngles || []).join(', ') || '새로운 시각'}
+- 구조 차별화: ${patternAnalysis.differentStructure || '역순 또는 반박 구조'}
+
+위 분석을 반드시 반영해서 기존 글들과 명확히 다른 글을 써라.`;
+  }
+
+  // ===== STEP 3: 글 생성 =====
+  setLoading('tistoryLoading', true, '차별화된 글을 작성 중...');
 
   try {
     const result = await callClaude(
       TISTORY_SYSTEM[postStyle],
       `오늘 날짜: ${ctx.dateStr} / 현재 계절: ${ctx.season} / 이달 시의성: ${ctx.monthlyKeywords}
+${differentiationGuide}
 
-다음 주제로 위 형식과 톤앤매너에 맞게 작성해주세요: ${title}
+다음 주제로 위 형식, 톤앤매너, 차별화 지시에 맞게 작성해주세요: ${title}
 
 주의사항:
-- 이 주제만 다룰 것. 주제와 무관한 내용 일절 금지.
+- 이 주제만 다룰 것.
 - 현재 계절(${ctx.season})을 자연스럽게 반영할 것.
 - 목차를 반드시 글 상단에 포함할 것.
-- 총 분량 준수. 각 소제목 아래 내용이 충분히 채워져야 함.`,
+- 총 분량 준수. 각 소제목 아래 내용이 충분히 채워져야 함.
+- 인터넷에 이미 있는 표현과 구조를 반복하지 말 것.`,
       3500
     );
 
