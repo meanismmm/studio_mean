@@ -241,7 +241,7 @@
       <section class="tab-panel" id="tab-tistory">
         <div class="panel-header">
           <h1>티스토리 블로그</h1>
-          <p>블랙키위 트렌드 키워드를 붙여넣으면 필터링 후 SEO 글을 생성합니다</p>
+          <p>블랙키위 트렌드 화면을 캡처해서 붙여넣으면 AI가 읽고 필터링합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
@@ -249,21 +249,25 @@
             <!-- 왼쪽: 입력 -->
             <div class="col">
 
-              <!-- STEP 1: 트렌드 키워드 붙여넣기 -->
+              <!-- STEP 1: 스크린샷 붙여넣기 -->
               <div class="card">
-                <div class="card-title">STEP 1 — 트렌드 키워드 붙여넣기</div>
+                <div class="card-title">STEP 1 — 블랙키위 스크린샷</div>
 
-                <div class="form-group">
-                  <label>
-                    블랙키위 일간 트렌드 키워드
-                    <span class="optional"> — 텍스트로 붙여넣기</span>
-                  </label>
-                  <textarea id="tistoryTrendInput" rows="8"
-                    placeholder="블랙키위에서 복사한 트렌드 키워드를 붙여넣으세요.&#10;&#10;예시:&#10;템플스테이&#10;차량 2부제 시행&#10;김지영&#10;재택근무&#10;이즈나&#10;공영주차장5부제&#10;맥수술&#10;삼성전자 실적&#10;&#10;한 줄에 하나씩, 또는 공백/쉼표로 구분해도 됩니다."></textarea>
+                <div class="dropzone" id="blackkiwiDropzone">
+                  <div class="dropzone-inner">
+                    <span class="dropzone-icon">📋</span>
+                    <p class="dropzone-text">Ctrl+V 붙여넣기 / 클릭 업로드 / 드래그앤드롭</p>
+                    <p class="dropzone-sub">블랙키위 트렌드 화면 스크린샷</p>
+                  </div>
                 </div>
+                <input type="file" id="blackkiwiFileInput" accept="image/*" style="display:none" />
 
-                <button class="btn btn-primary" onclick="filterTistoryKeywords()">
-                  <span>🔍 필터링 + 키워드 생성</span>
+                <!-- 이미지 미리보기 -->
+                <div id="blackkiwiPreview" style="display:none;margin-top:12px;"></div>
+
+                <button class="btn btn-primary" id="blackkiwiFilterBtn"
+                  style="display:none;margin-top:12px" onclick="filterTistoryKeywords()">
+                  <span>🔍 키워드 읽기 + 필터링</span>
                 </button>
               </div>
 
@@ -293,7 +297,7 @@
             <div class="col">
               <div class="loading-card" id="tistoryLoading" style="display:none">
                 <div class="spinner"></div>
-                <p id="tistoryLoadingText">키워드를 분석 중입니다...</p>
+                <p id="tistoryLoadingText">이미지에서 키워드를 읽는 중...</p>
               </div>
 
               <!-- 필터링 결과 -->
