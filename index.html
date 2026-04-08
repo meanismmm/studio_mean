@@ -5,10 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Studio Mean</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+
+  <!-- 스플래시 화면 -->
+  <div class="splash" id="splash">
+    <div class="splash-logo">Studio Mean</div>
+    <div class="splash-quote">
+      <span class="splash-quote-mark">"</span>
+      <p class="splash-quote-text" id="splashQuoteText"></p>
+      <div class="splash-divider"></div>
+      <p class="splash-quote-author" id="splashQuoteAuthor"></p>
+    </div>
+    <button class="splash-enter" onclick="enterApp()">시작하기</button>
+  </div>
+
   <div class="app">
 
     <nav class="sidebar">
@@ -440,6 +453,47 @@
     </main>
   </div>
 
+  <script>
+  // ===== 명언 데이터 =====
+  const QUOTES = [
+    { text: "부자가 되고 싶다면, 부자처럼 생각하는 것을 멈추고 부자처럼 행동하기 시작하라.", author: "나폴레온 힐" },
+    { text: "기회는 노력하는 사람에게만 문을 연다.", author: "루이 파스퇴르" },
+    { text: "돈은 씨앗과 같다. 심지 않으면 절대 자라지 않는다.", author: "작자 미상" },
+    { text: "성공은 준비와 기회가 만나는 지점이다.", author: "세네카" },
+    { text: "지금 당장 시작하라. 완벽한 타이밍 같은 건 없다.", author: "나폴레온 힐" },
+    { text: "부는 목적지가 아니라 여정의 부산물이다. 가치를 만들면 돈은 따라온다.", author: "워런 버핏" },
+    { text: "오늘 하기 싫은 일을 하는 사람이 내일 하고 싶은 일을 할 수 있다.", author: "작자 미상" },
+    { text: "평범한 사람은 시간을 보내고, 재능 있는 사람은 시간을 쓰며, 천재는 시간을 훔친다.", author: "아르투어 쇼펜하우어" },
+    { text: "돈을 벌기 위해 잠자는 동안에도 일하는 방법을 찾지 못한다면, 죽을 때까지 일해야 할 것이다.", author: "워런 버핏" },
+    { text: "실패는 성공으로 가는 여정의 일부일 뿐이다.", author: "월트 디즈니" },
+    { text: "남들이 놀 때 공부하고, 남들이 잘 때 일하는 사람이 성공한다.", author: "작자 미상" },
+    { text: "작은 기회로부터 종종 위대한 업적이 시작된다.", author: "데모스테네스" },
+    { text: "땀방울이 없으면 성공도 없다. 노력한 만큼 얻는 것이 세상의 이치다.", author: "작자 미상" },
+    { text: "1%의 영감과 99%의 노력이 천재를 만든다.", author: "토마스 에디슨" },
+    { text: "부자는 남들이 쉬는 시간에 도서관에 간다.", author: "작자 미상" },
+    { text: "당신이 생각하는 것보다 훨씬 강하다. 그것을 증명할 기회가 바로 지금이다.", author: "작자 미상" },
+    { text: "어제의 나보다 오늘의 내가 조금이라도 나아졌다면, 그것이 성공이다.", author: "작자 미상" },
+    { text: "돈은 도구다. 그것이 당신을 부릴지, 당신이 그것을 부릴지는 당신의 선택이다.", author: "작자 미상" },
+    { text: "꿈을 현실로 만드는 유일한 방법은 깨어나 일하는 것이다.", author: "작자 미상" },
+    { text: "시간은 가장 공평한 자원이다. 부자도 가난한 자도 하루 24시간을 가진다.", author: "작자 미상" }
+  ];
+
+  function enterApp() {
+    document.getElementById('splash').classList.add('hidden');
+  }
+
+  // 랜덤 명언 설정
+  const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  document.getElementById('splashQuoteText').textContent = q.text;
+  document.getElementById('splashQuoteAuthor').textContent = '— ' + q.author;
+
+  // 스페이스바/엔터로도 진입
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && !document.getElementById('splash').classList.contains('hidden')) {
+      enterApp();
+    }
+  });
+  </script>
   <script src="js/api.js"></script>
   <script src="js/blog.js"></script>
   <script src="js/threads.js"></script>
