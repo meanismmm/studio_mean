@@ -21,21 +21,26 @@ const TISTORY_POST_STYLE = {
   parenting: 'info'
 };
 
-// ===== 티스토리 시스템 프롬프트 =====
+// ===== 티스토리 시스템 프롬프트 (차별화 지시 강화) =====
 const TISTORY_SYSTEM = {
   health: `당신은 건강·음식 정보 티스토리 블로그 작가입니다.
 
-[핵심 원칙 — 차별화 필수]
-- 인터넷에 이미 넘쳐나는 일반론 절대 금지.
-- 독자가 "이건 다른 데서 못 읽은 내용이다"라고 느껴야 한다.
-- 구체적 수치는 반드시 "왜 그 수치인지" 메커니즘까지 설명한다. 수치만 나열 금지.
-- 반박 포인트 포함: "흔히 알려진 것과 달리~", "실제로는~" 식의 전환이 1개 이상 있어야 한다.
-- 현재 계절과 시의성을 자연스럽게 반영한다.
+[절대 금지 — 위반 시 글 전체가 무가치해짐]
+- "2주에 한 번", "충분한 수분 섭취", "규칙적인 운동" 같은 뻔한 조언 금지
+- 수치만 나열하고 이유 안 쓰는 것 금지 (예: "30% 절약" → 왜 30%인지 메커니즘까지)
+- 다른 블로그에서 복붙할 수 있는 일반론 금지
+- "~하는 것이 좋습니다", "도움이 됩니다" 같은 흐릿한 표현 금지
+
+[반드시 포함]
+- "흔히 알려진 것과 달리~", "실제로는~" 식의 반박 포인트 최소 1개
+- 수치의 메커니즘 설명 (왜 그 수치인지 원리까지)
+- 독자가 "이건 다른 데서 못 읽었다"고 느낄 각도
 
 [톤앤매너]
 - 1인칭. "이게 궁금해서 직접 찾아봤는데" 식의 친근한 구어체.
 - 단언체: "~다", "~해야 한다".
 - 공포 조장 금지. 희망적 프레이밍.
+- 현재 계절과 시의성을 자연스럽게 반영.
 
 [구조]
 [목차]
@@ -45,31 +50,31 @@ const TISTORY_SYSTEM = {
 4. (소제목4)
 5. (소제목5)
 
-서론: 독자가 이미 알고 있다고 착각하는 것에 균열을 내는 도입. 180~220자.
-
+서론: 독자가 알고 있다고 착각하는 것에 균열을 내는 도입. 180~220자.
 (사진)
-
-## (소제목1~5)
-각 320~400자. 수치의 메커니즘까지 설명. 반박 포인트 포함.
-
+## (소제목1~5): 각 320~400자. 원리와 반박 포인트 포함.
 (사진)
-
-[정리]
-핵심 3줄 요약. 뻔한 말 금지.
+[정리]: 핵심 3줄. 뻔한 말 금지.
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   info: `당신은 생활정보 티스토리 블로그 작가입니다.
 
-[핵심 원칙 — 차별화 필수]
-- 인터넷에서 복붙되는 팁 목록 절대 금지.
-- 각 항목은 "왜 대부분의 사람이 이걸 잘못 알고 있는지"부터 시작한다.
-- 역발상, 실패 경험, 비용/시간의 현실적 계산 중 하나 이상 포함.
-- 현재 계절과 시의성을 자연스럽게 반영한다.
+[절대 금지 — 위반 시 글 전체가 무가치해짐]
+- 인터넷에서 복붙되는 팁 목록 나열 금지
+- "~하면 좋습니다", "참고하세요" 같은 흐릿한 마무리 금지
+- 이유 없는 방법 나열 금지 (왜 그래야 하는지 원리 필수)
+- 다른 블로그 10개에서 똑같이 나오는 내용 금지
+
+[반드시 포함]
+- 역발상 또는 "대부분이 잘못 알고 있는 것" 시각 최소 1개
+- 비용/시간의 현실적 계산 또는 실패 경험 포함
+- 독자가 "이건 달랐다"고 느낄 구체적 맥락
 
 [톤앤매너]
 - 1인칭. 직접 해보거나 찾아본 사람처럼.
 - 단언체. 시니컬한 구어체이되 정보 밀도 높게.
+- 현재 계절과 시의성 자연스럽게 반영.
 
 [구조]
 [목차]
@@ -79,26 +84,25 @@ const TISTORY_SYSTEM = {
 4. (소제목4)
 5. (소제목5)
 
-서론: 왜 기존에 알던 방식이 틀렸거나 부족한지 한 방에 설득. 180~220자.
-
+서론: 기존 방식이 왜 틀렸는지 한 방에 설득. 180~220자.
 (사진)
-
-## (소제목1~5)
-각 320~400자. 단순 방법이 아닌 원리와 현실적 맥락 포함.
-
+## (소제목1~5): 각 320~400자. 원리와 현실적 맥락 포함.
 (사진)
-
-[한 줄 정리]
-핵심 한 줄로 끊음. 뻔하지 않게.
+[한 줄 정리]: 뻔하지 않게.
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   recommend: `당신은 추천·비교 콘텐츠 티스토리 블로그 작가입니다.
 
-[핵심 원칙 — 차별화 필수]
-- "가성비 최고", "강력 추천" 같은 광고성 표현 절대 금지.
-- 단점을 솔직하게 쓰되 "이런 사람에게는 이게 맞다"로 정리한다.
-- 가격 대비 현실적 판단 포함.
+[절대 금지]
+- "가성비 최고", "강력 추천", "후회 없는 선택" 같은 광고성 표현
+- 단점 없는 추천 (신뢰 없음)
+- 근거 없는 순위
+
+[반드시 포함]
+- 각 항목의 단점과 "이런 사람에게는 안 맞다" 명시
+- 구체적 가격대와 현실적 판단
+- "비싼 게 항상 낫지 않다"는 관점 유지
 
 [톤앤매너]
 - 1인칭. 직접 써봤거나 꼼꼼히 비교해본 사람의 시점.
@@ -110,7 +114,7 @@ const TISTORY_SYSTEM = {
 2~5. (추천항목별)
 6. 유형별 최종 추천 요약
 
-각 항목 320~380자. 특징, 장단점, 가격대, 추천 대상 명시.
+각 항목 320~380자. 특징·장단점·가격대·추천 대상 명시.
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   essay: `당신은 티스토리 개인 블로그 작가입니다.
@@ -120,7 +124,7 @@ const TISTORY_SYSTEM = {
 
 - 1인칭. 자기 생각을 직설적으로 밀어붙임.
 - 시니컬하되 히스테릭하지 않음. 억지 유머 금지. 마무리는 짧게 끊음.
-- 현재 날짜/계절/시의성을 자연스럽게 반영.
+- 현재 날짜/계절/시의성 자연스럽게 반영.
 
 [구조]
 [목차] 1~3개 소제목
@@ -265,12 +269,12 @@ async function generatePsychPost(title) {
 
 // ==================== 티스토리 — 트렌드 키워드 기반 ====================
 
-// STEP 1: 트렌드 키워드 붙여넣기 → 필터링
+// STEP 1: 트렌드 키워드 붙여넣기 → 필터링 (API 1회 호출)
 async function filterTistoryKeywords() {
   const raw = document.getElementById('tistoryTrendInput').value.trim();
   if (!raw) { showToast('트렌드 키워드를 붙여넣어 주세요'); return; }
 
-  setLoading('tistoryLoading', true, '키워드를 분석하고 필터링 중입니다...');
+  setLoading('tistoryLoading', true, '키워드 필터링 중...');
   document.getElementById('tistoryKeywordResult').style.display = 'none';
   document.getElementById('tistoryStep2').style.display = 'none';
   document.getElementById('tistoryResult').style.display = 'none';
@@ -280,31 +284,29 @@ async function filterTistoryKeywords() {
   try {
     const result = await callClaude(
       `당신은 티스토리 애드센스 블로그 키워드 전략가입니다.
-트렌드 키워드 목록을 분석해서 블로그 포스팅에 적합한 키워드만 선별하고
-반드시 순수 JSON만 반환하세요.`,
+반드시 순수 JSON만 반환하세요. 마크다운 없이 JSON만.`,
       `오늘 날짜: ${ctx.dateStr} / 계절: ${ctx.season}
 
 아래는 오늘의 트렌드 키워드 목록입니다:
 ${raw}
 
-다음 기준으로 필터링하세요:
-
 [제거할 키워드]
-- 연예인, 인물 이름 (가수, 배우, 운동선수, 정치인 등)
-- 연예/방송/음악 관련 (드라마, 예능, 앨범, 콘서트 등)
-- 단발성 사건/사고 (특정 기업 실적 발표, 주가, 사건사고)
-- 지역 특정 행사나 이슈
+- 연예인·인물 이름 (가수, 배우, 운동선수, 정치인 등)
+- 연예·방송·음악 관련 (드라마, 예능, 앨범, 콘서트 등)
+- 단발성 사건·사고 (특정 기업 실적, 주가, 사건사고)
+- 지역 특정 행사·이슈
 - 스포츠 경기 결과
+- 조회수 숫자나 증감률 (+5.7천, 32 같은 숫자만 있는 항목)
 
 [남길 키워드]
-- 정보성 검색 가능한 키워드 (방법, 이유, 효과, 비용 등으로 파생 가능)
-- 생활/건강/금융/육아/여행 등 일상 밀착 키워드
-- 정책/제도 변경 (차량 2부제, 주차 정책 등 — 정보글 작성 가능)
-- 계절/시즌 관련 정보성 키워드
+- 정보성 검색 가능 (방법, 이유, 효과, 비용 등으로 파생 가능)
+- 생활·건강·금융·육아·여행 등 일상 밀착
+- 정책·제도 변경 (정보글 작성 가능한 것)
+- 계절·시즌 관련 정보성 키워드
 
 남긴 키워드마다:
-1. 블로그 글로 쓸 수 있는 2~3차 파생 키워드 3개 생성
-2. 예상 카테고리 판단 (health/food/living/recommend/issue/finance/parenting)
+1. 2~3차 파생 키워드 3개 생성 (메인보다 구체적인 롱테일)
+2. 카테고리 (health/food/living/recommend/issue/finance/parenting 중 하나)
 3. 선정 이유 한 줄
 
 반드시 순수 JSON으로만:
@@ -334,7 +336,7 @@ ${raw}
 
 // 필터링 결과 렌더링
 function renderFilteredKeywords(data) {
-  const box = document.getElementById('tistoryKeywordResult');
+  const box      = document.getElementById('tistoryKeywordResult');
   const filtered = data.filtered || [];
   const removed  = data.removed  || [];
 
@@ -347,7 +349,6 @@ function renderFilteredKeywords(data) {
     return;
   }
 
-  // 전체 키워드 복사용
   const allKeywords = filtered.flatMap(k => [k.main, ...k.derivatives]);
 
   const catColors = {
@@ -364,7 +365,8 @@ function renderFilteredKeywords(data) {
       필터링 결과 — ${filtered.length}개 선별
       <div style="display:flex;gap:6px;align-items:center">
         <span style="font-size:10px;color:var(--text-muted);font-weight:400">제거 ${removed.length}개</span>
-        <button class="btn-sm btn-accent" onclick="navigator.clipboard.writeText(${JSON.stringify(allKeywords.join('\n'))}).then(()=>showToast('전체 키워드 복사됨!'))">
+        <button class="btn-sm btn-accent"
+          onclick="navigator.clipboard.writeText(${JSON.stringify(allKeywords.join('\n'))}).then(()=>showToast('전체 키워드 복사됨!'))">
           📋 전체 복사
         </button>
       </div>
@@ -374,12 +376,12 @@ function renderFilteredKeywords(data) {
       📌 아래 키워드를 <strong style="color:var(--navy)">네이버</strong>에서 검색하세요.<br>
       ① 파워링크(광고) 존재 확인 &nbsp;|&nbsp;
       ② <a href="https://searchad.naver.com" target="_blank" style="color:var(--navy-light);font-weight:600">네이버 키워드 도구</a>에서 월간 조회수 확인<br>
-      <strong style="color:var(--teal)">조회수 5만 이상 + 파워링크 있음</strong> → STEP 2에 입력
+      <strong style="color:var(--teal)">조회수 5만 이상 + 파워링크 있음</strong> → 파생 키워드 옆 <strong style="color:var(--navy)">선택</strong> 버튼 클릭
     </div>
 
     <div class="keyword-grid">
       ${filtered.map((k, i) => {
-        const color = catColors[k.category] || '#1c2b4a';
+        const color   = catColors[k.category]  || '#1c2b4a';
         const catName = catNames[k.category] || k.category;
         return `
         <div class="keyword-card">
@@ -394,7 +396,10 @@ function renderFilteredKeywords(data) {
             ${k.derivatives.map(d => `
               <div class="keyword-derivative">
                 <span>↳ ${d}</span>
-                <button class="btn-sm" onclick="navigator.clipboard.writeText('${d}').then(()=>showToast('복사됨!'));document.getElementById('tistoryFinalKeyword').value='${d}';document.getElementById('tistoryStep2Category').value='${k.category}';document.getElementById('tistoryStep2').style.display='block';">선택</button>
+                <button class="btn-sm btn-accent"
+                  onclick="selectKeyword('${d.replace(/'/g,"\\'")}', '${k.category}')">
+                  선택
+                </button>
               </div>
             `).join('')}
           </div>
@@ -404,7 +409,7 @@ function renderFilteredKeywords(data) {
 
     ${removed.length ? `
     <div style="margin-top:14px;padding:10px 13px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border)">
-      <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:0.1em;margin-bottom:6px">REMOVED — 필터링된 키워드</div>
+      <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:0.1em;margin-bottom:6px">REMOVED</div>
       <div style="font-size:12px;color:var(--text-muted)">${removed.join(' · ')}</div>
     </div>` : ''}
   `;
@@ -413,7 +418,15 @@ function renderFilteredKeywords(data) {
   document.getElementById('tistoryStep2').style.display = 'block';
 }
 
-// STEP 2: 최종 키워드로 글 생성
+// 파생 키워드 선택 → STEP 2 자동 입력
+function selectKeyword(keyword, category) {
+  document.getElementById('tistoryFinalKeyword').value = keyword;
+  document.getElementById('tistoryStep2Category').value = category;
+  document.getElementById('tistoryStep2').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast(`"${keyword}" 선택됨`);
+}
+
+// STEP 2: 글 생성 (API 1회 호출만)
 async function generateTistoryFromKeyword() {
   const keyword = document.getElementById('tistoryFinalKeyword').value.trim();
   if (!keyword) { showToast('최종 키워드를 입력해주세요'); return; }
@@ -429,43 +442,22 @@ async function generateTistoryFromKeyword() {
     essay:     'daily life society people'
   };
 
-  // 기존 글 패턴 분석
-  setLoading('tistoryLoading', true, '기존 글 패턴 분석 중...');
+  setLoading('tistoryLoading', true, '블로그 글을 작성 중...');
   document.getElementById('tistoryResult').style.display = 'none';
-
-  let differentiationGuide = '';
-  try {
-    const patternAnalysis = await analyzeExistingContent(keyword);
-    if (patternAnalysis) {
-      differentiationGuide = `
-[차별화 필수 지시 — 검색 분석 결과]
-기존 상위 글들의 공통 구조: ${patternAnalysis.commonStructure || '없음'}
-반복 수치 (그대로 쓰지 마라): ${(patternAnalysis.overusedNumbers || []).join(', ') || '없음'}
-반복 팁 (그대로 쓰지 마라): ${(patternAnalysis.overusedTips || []).join(', ') || '없음'}
-상투적 표현 (그대로 쓰지 마라): ${(patternAnalysis.overusedPhrases || []).join(', ') || '없음'}
-차별화 각도: ${(patternAnalysis.unusedAngles || []).join(', ') || '새로운 시각'}
-구조 차별화: ${patternAnalysis.differentStructure || '역순 또는 반박 구조'}`;
-    }
-  } catch(e) {
-    console.warn('패턴 분석 실패, 기본값으로 진행');
-  }
-
-  setLoading('tistoryLoading', true, '차별화된 글을 작성 중...');
 
   try {
     const result = await callClaude(
       TISTORY_SYSTEM[postStyle],
       `오늘 날짜: ${ctx.dateStr} / 현재 계절: ${ctx.season} / 이달 시의성: ${ctx.monthlyKeywords}
-${differentiationGuide}
 
 다음 키워드로 SEO 최적화된 블로그 글을 작성해주세요: "${keyword}"
 
 [SEO 지시]
 - 제목에 키워드 "${keyword}" 반드시 포함
 - 첫 문단에 키워드 자연스럽게 포함
-- 소제목에 키워드 변형 표현 포함
+- 소제목에 키워드 변형 표현 포함 (예: "${keyword} 방법", "${keyword} 주의사항" 등)
 - 목차를 반드시 글 상단에 포함
-- 인터넷에 이미 있는 표현과 구조를 반복하지 말 것`,
+- 총 분량 준수. 각 소제목 아래 충분히 채울 것.`,
       3500
     );
 
@@ -484,48 +476,4 @@ ${differentiationGuide}
   } finally {
     setLoading('tistoryLoading', false);
   }
-}
-
-// 기존 글 패턴 분석 (차별화용)
-async function analyzeExistingContent(keyword) {
-  const apiKey = localStorage.getItem('CLAUDE_API_KEY');
-  if (!apiKey) return null;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 800,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      system: '당신은 블로그 콘텐츠 차별화 전략가입니다. 반드시 순수 JSON만 반환하세요.',
-      messages: [{
-        role: 'user',
-        content: `"${keyword}" 키워드로 검색해서 상위 블로그 글 3~5개를 분석하세요.
-
-반드시 아래 JSON 형식으로만:
-{
-  "commonStructure": "상위 글들의 공통 구조나 전개 방식",
-  "overusedNumbers": ["반복되는 수치들"],
-  "overusedTips": ["여러 글에서 반복되는 팁"],
-  "overusedPhrases": ["자주 등장하는 상투적 표현"],
-  "unusedAngles": ["아직 다뤄지지 않은 각도나 관점"],
-  "differentStructure": "차별화할 수 있는 구조 제안"
-}`
-      }]
-    })
-  });
-
-  if (!response.ok) return null;
-  const data = await response.json();
-  const textBlock = data.content?.find(b => b.type === 'text');
-  if (!textBlock?.text) return null;
-
-  try { return safeParseJSON(textBlock.text); }
-  catch(e) { return null; }
 }
