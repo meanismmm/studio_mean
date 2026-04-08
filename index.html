@@ -241,7 +241,7 @@
       <section class="tab-panel" id="tab-tistory">
         <div class="panel-header">
           <h1>티스토리 블로그</h1>
-          <p>수익성 키워드를 발굴하고 SEO 최적화 글을 생성합니다</p>
+          <p>블랙키위 트렌드 키워드를 붙여넣으면 필터링 후 SEO 글을 생성합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
@@ -249,40 +249,36 @@
             <!-- 왼쪽: 입력 -->
             <div class="col">
 
-              <!-- STEP 1: 키워드 발굴 -->
+              <!-- STEP 1: 트렌드 키워드 붙여넣기 -->
               <div class="card">
-                <div class="card-title">STEP 1 — 키워드 발굴</div>
+                <div class="card-title">STEP 1 — 트렌드 키워드 붙여넣기</div>
 
                 <div class="form-group">
-                  <label>카테고리</label>
-                  <select id="tistoryCategory">
-                    <option value="health">건강·증상</option>
-                    <option value="food">음식·영양</option>
-                    <option value="living">생활·절약</option>
-                    <option value="recommend">추천·비교</option>
-                    <option value="issue">시사·이슈</option>
-                    <option value="finance">재테크·금융</option>
-                    <option value="parenting">육아·교육</option>
-                  </select>
+                  <label>
+                    블랙키위 일간 트렌드 키워드
+                    <span class="optional"> — 텍스트로 붙여넣기</span>
+                  </label>
+                  <textarea id="tistoryTrendInput" rows="8"
+                    placeholder="블랙키위에서 복사한 트렌드 키워드를 붙여넣으세요.&#10;&#10;예시:&#10;템플스테이&#10;차량 2부제 시행&#10;김지영&#10;재택근무&#10;이즈나&#10;공영주차장5부제&#10;맥수술&#10;삼성전자 실적&#10;&#10;한 줄에 하나씩, 또는 공백/쉼표로 구분해도 됩니다."></textarea>
                 </div>
 
-                <button class="btn btn-primary" onclick="discoverTistoryKeywords()">
-                  <span>🔍 키워드 발굴 시작</span>
+                <button class="btn btn-primary" onclick="filterTistoryKeywords()">
+                  <span>🔍 필터링 + 키워드 생성</span>
                 </button>
               </div>
 
-              <!-- STEP 2: 최종 키워드 입력 -->
+              <!-- STEP 2: 최종 키워드 선택 + 글 생성 -->
               <div class="card" id="tistoryStep2" style="display:none">
-                <div class="card-title">STEP 2 — 최종 키워드 입력</div>
-                <input type="hidden" id="tistoryStep2Category" value="health" />
+                <div class="card-title">STEP 2 — 최종 키워드 확인 후 생성</div>
+                <input type="hidden" id="tistoryStep2Category" value="living" />
 
                 <div class="form-group">
                   <label>네이버 확인 완료한 키워드</label>
                   <input type="text" id="tistoryFinalKeyword"
-                    placeholder="예: 춘곤증 극복하는 방법"
+                    placeholder="오른쪽 목록에서 '선택' 버튼을 누르거나 직접 입력"
                     onkeydown="if(event.key==='Enter') generateTistoryFromKeyword();" />
-                  <div style="font-size:11px;color:#55556a;margin-top:5px;font-family:'DM Mono',monospace">
-                    파워링크 ✓ &nbsp;|&nbsp; 월간 조회수 5만+ ✓ 확인한 키워드만 입력
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono);line-height:1.6">
+                    파워링크 ✓ &nbsp;|&nbsp; 월간 조회수 5만+ ✓ 확인된 키워드만
                   </div>
                 </div>
 
@@ -300,7 +296,7 @@
                 <p id="tistoryLoadingText">키워드를 분석 중입니다...</p>
               </div>
 
-              <!-- 키워드 발굴 결과 -->
+              <!-- 필터링 결과 -->
               <div class="card result-card" id="tistoryKeywordResult" style="display:none">
                 <!-- JS 렌더링 -->
               </div>
