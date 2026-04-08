@@ -228,37 +228,71 @@
       <section class="tab-panel" id="tab-tistory">
         <div class="panel-header">
           <h1>티스토리 블로그</h1>
-          <p>애드센스 최적화 정보성 글을 생성합니다</p>
+          <p>수익성 키워드를 발굴하고 SEO 최적화 글을 생성합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
+
+            <!-- 왼쪽: 입력 -->
             <div class="col">
+
+              <!-- STEP 1: 키워드 발굴 -->
               <div class="card">
-                <div class="card-title">주제 추천</div>
+                <div class="card-title">STEP 1 — 키워드 발굴</div>
+
                 <div class="form-group">
-                  <label>카테고리 선택</label>
-                  <div class="checkbox-group" id="tistoryCategoryGroup">
-                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="health" checked /> 건강·증상</label>
-                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="food" /> 음식·영양</label>
-                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="living" /> 생활·절약</label>
-                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="recommend" /> 추천·비교</label>
-                    <label class="check-label"><input type="checkbox" name="tistoryCategory" value="issue" /> 시사·이슈</label>
-                  </div>
+                  <label>카테고리</label>
+                  <select id="tistoryCategory">
+                    <option value="health">건강·증상</option>
+                    <option value="food">음식·영양</option>
+                    <option value="living">생활·절약</option>
+                    <option value="recommend">추천·비교</option>
+                    <option value="issue">시사·이슈</option>
+                    <option value="finance">재테크·금융</option>
+                    <option value="parenting">육아·교육</option>
+                  </select>
                 </div>
-                <button class="btn btn-primary" onclick="recommendTistoryTopics()">
-                  <span>주제 추천 (5개)</span>
+
+                <button class="btn btn-primary" onclick="discoverTistoryKeywords()">
+                  <span>🔍 키워드 발굴 시작</span>
                 </button>
               </div>
-              <div class="card" id="tistoryTopicCard" style="display:none">
-                <div class="card-title">추천 주제 — 선택하세요</div>
-                <div class="topic-list" id="tistoryTopicList"></div>
+
+              <!-- STEP 2: 최종 키워드 입력 -->
+              <div class="card" id="tistoryStep2" style="display:none">
+                <div class="card-title">STEP 2 — 최종 키워드 입력</div>
+                <input type="hidden" id="tistoryStep2Category" value="health" />
+
+                <div class="form-group">
+                  <label>네이버 확인 완료한 키워드</label>
+                  <input type="text" id="tistoryFinalKeyword"
+                    placeholder="예: 춘곤증 극복하는 방법"
+                    onkeydown="if(event.key==='Enter') generateTistoryFromKeyword();" />
+                  <div style="font-size:11px;color:#55556a;margin-top:5px;font-family:'DM Mono',monospace">
+                    파워링크 ✓ &nbsp;|&nbsp; 월간 조회수 5만+ ✓ 확인한 키워드만 입력
+                  </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="generateTistoryFromKeyword()">
+                  <span>✍️ 글 생성</span>
+                </button>
               </div>
+
             </div>
+
+            <!-- 오른쪽: 결과 -->
             <div class="col">
               <div class="loading-card" id="tistoryLoading" style="display:none">
                 <div class="spinner"></div>
-                <p id="tistoryLoadingText">블로그 글을 작성 중입니다...</p>
+                <p id="tistoryLoadingText">키워드를 분석 중입니다...</p>
               </div>
+
+              <!-- 키워드 발굴 결과 -->
+              <div class="card result-card" id="tistoryKeywordResult" style="display:none">
+                <!-- JS 렌더링 -->
+              </div>
+
+              <!-- 생성된 글 -->
               <div class="card result-card" id="tistoryResult" style="display:none">
                 <div class="card-title">
                   생성된 블로그 글
@@ -275,6 +309,7 @@
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
