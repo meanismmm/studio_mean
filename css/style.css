@@ -769,3 +769,63 @@ select option { background: var(--bg-card); }
   transition: background 0.12s;
 }
 .preview-remove:hover { background: var(--rose); }
+
+/* ===== 키워드 리서치 UI ===== */
+.keyword-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.keyword-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.keyword-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.keyword-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 22px;
+}
+
+.keyword-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.keyword-reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-left: 30px;
+  font-family: var(--font-mono);
+}
+
+.keyword-derivatives {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 30px;
+}
+
+.keyword-derivative {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+}
