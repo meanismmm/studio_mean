@@ -12,6 +12,8 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
+  console.log('[claude-search] keyword:', keyword);
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -45,25 +47,30 @@ module.exports = async function handler(req, res) {
       })
     });
 
+    console.log('[claude-search] status:', response.status);
     const data = await response.json();
+    console.log('[claude-search] content types:', data.content?.map(b => b.type).join(', '));
 
-    // 텍스트 블록만 추출
     const textBlock = data.content?.find(b => b.type === 'text');
+    console.log('[claude-search] text:', textBlock?.text?.slice(0, 300));
+
     if (!textBlock?.text) {
+      console.log('[claude-search] no text block, returning empty');
       return res.status(200).json({ facts: [], caution: [], summary: '검색 결과 없음' });
     }
 
-    // JSON 파싱
     const text = textBlock.text.replace(/```json|```/g, '').trim();
     try {
       const parsed = JSON.parse(text);
+      console.log('[claude-search] parsed facts count:', parsed.facts?.length);
       return res.status(200).json(parsed);
-    } catch {
+    } catch (e) {
+      console.log('[claude-search] JSON parse failed:', e.message);
       return res.status(200).json({ facts: [], caution: [], summary: text.slice(0, 200) });
     }
 
   } catch (err) {
-    console.error('claude-search error:', err.message);
+    console.error('[claude-search] error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 };
