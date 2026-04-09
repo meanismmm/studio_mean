@@ -11,15 +11,15 @@ export default async function handler(req, res) {
   const { keywords } = req.body;
   if (!keywords || !keywords.length) return res.status(400).json({ error: 'keywords required' });
 
-  const license = process.env.NAVER_API_LICENSE;
-  const secret = process.env.NAVER_API_SECRET;
+  const license    = process.env.NAVER_API_LICENSE;
+  const secret     = process.env.NAVER_API_SECRET;
   const customerId = process.env.NAVER_CUSTOMER_ID;
 
   const timestamp = Date.now().toString();
-  const method = 'GET';
-  const path = '/keywordstool';
-  const message = `${timestamp}.${method}.${path}`;
-  const signature = crypto.createHmac('sha256', secret).update(message).digest('base64');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`${timestamp}\nGET\n/keywordstool`)
+    .digest('base64');
 
   const params = new URLSearchParams({
     hintKeywords: keywords.join(','),
@@ -28,11 +28,13 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`https://api.naver.com/keywordstool?${params}`, {
+      method: 'GET',
       headers: {
-        'X-Timestamp': timestamp,
-        'X-API-KEY': license,
-        'X-Customer': customerId,
-        'X-Signature': signature,
+        'Content-Type':  'application/json; charset=UTF-8',
+        'X-Timestamp':   timestamp,
+        'X-API-KEY':     license,
+        'X-Customer':    customerId,
+        'X-Signature':   signature,
       }
     });
 
