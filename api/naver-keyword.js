@@ -45,9 +45,9 @@ module.exports = async function handler(req, res) {
       });
 
       const data = await response.json();
-      const list = data.keywordList || [];
+      console.log('naver raw:', JSON.stringify(data).slice(0, 500));
 
-      // 입력 키워드와 정확히 일치하는 항목 먼저 찾고, 없으면 첫 번째 항목 사용
+      const list = data.keywordList || [];
       const exact = list.find(k => k.relKeyword === keyword);
       const item  = exact || list[0];
 
@@ -61,5 +61,6 @@ module.exports = async function handler(req, res) {
       results[keyword] = null;
     }
   }
+
   res.status(200).json(results);
-}
+};
