@@ -9,6 +9,36 @@ function parseQcCnt(val) {
   return 0;
 }
 
+async function queryKeyword(kw, license, secret, customerId) {
+  const timestamp = Date.now().toString();
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(timestamp);
+  hmac.update('.');
+  hmac.update('GET');
+  hmac.update('.');
+  hmac.update('/keywordstool');
+  const signature = hmac.digest('base64');
+
+  const params = new URLSearchParams({
+    hintKeywords: kw,
+    showDetail: '1'
+  });
+
+  const response = await fetch(`https://api.searchad.naver.com/keywordstool?${params}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Timestamp':  timestamp,
+      'X-API-KEY':    license,
+      'X-Customer':   customerId,
+      'X-Signature':  signature,
+    }
+  });
+
+  const data = await response.json();
+  return data.keywordList || [];
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -29,41 +59,35 @@ module.exports = async function handler(req, res) {
   for (const keyword of keywords) {
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) continue;
 
-    const kw = keyword.trim();
-    const timestamp = Date.now().toString();
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(timestamp);
-    hmac.update('.');
-    hmac.update('GET');
-    hmac.update('.');
-    hmac.update('/keywordstool');
-    const signature = hmac.digest('base64');
-
-    const params = new URLSearchParams({
-      hintKeywords: kw,
-      showDetail: '1'
-    });
+    const kw        = keyword.trim();
+    const kwNoSpace = kw.replace(/\s+/g, ''); // 띄어쓰기 제거 버전
 
     try {
-      const response = await fetch(`https://api.searchad.naver.com/keywordstool?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Timestamp':  timestamp,
-          'X-API-KEY':    license,
-          'X-Customer':   customerId,
-          'X-Signature':  signature,
+      // 원본과 띄어쓰기 제거 버전 동시 조회
+      const variants = kwNoSpace !== kw ? [kw, kwNoSpace] : [kw];
+      let bestItem = null;
+      let bestTotal = -1;
+
+      for (const variant of variants) {
+        const list = await queryKeyword(variant, license, secret, customerId);
+
+        // 정확히 일치하는 항목 우선, 없으면 첫 번째
+        const exact = list.find(k => k.relKeyword === variant);
+        const item  = exact || list[0];
+
+        if (item) {
+          const pc = parseQcCnt(item.monthlyPcQcCnt);
+          const mo = parseQcCnt(item.monthlyMobileQcCnt);
+          const total = pc + mo;
+          if (total > bestTotal) {
+            bestTotal = total;
+            bestItem = { pc, mobile: mo, total };
+          }
         }
-      });
+      }
 
-      const data = await response.json();
-
-      if (data.keywordList && data.keywordList.length > 0) {
-        const exact = data.keywordList.find(k => k.relKeyword === kw);
-        const item  = exact || data.keywordList[0];
-        const pc = parseQcCnt(item.monthlyPcQcCnt);
-        const mo = parseQcCnt(item.monthlyMobileQcCnt);
-        results[kw] = { pc, mobile: mo, total: pc + mo };
+      if (bestItem) {
+        results[kw] = bestItem;
       } else {
         results[kw] = { pc: 0, mobile: 0, total: 0 };
       }
