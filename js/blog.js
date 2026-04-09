@@ -144,6 +144,52 @@ function volBadge(volData, keyword) {
   return `<span style="font-size:10px;font-family:var(--font-mono);color:${color};background:${color}18;padding:2px 8px;border-radius:20px;border:1px solid ${color}30">🔍 ${formatVol(total)} (PC ${formatVol(v.pc)} / 모 ${formatVol(v.mobile)})</span>`;
 }
 
+// ===== 메인 키워드 인라인 편집 + 재조회 =====
+function editMainKeyword(cardId, currentKeyword) {
+  const textEl  = document.getElementById(`kw-text-${cardId}`);
+  const badgeEl = document.getElementById(`kw-badge-${cardId}`);
+  if (!textEl) return;
+
+  // 편집 모드로 전환
+  textEl.innerHTML = `
+    <input id="kw-input-${cardId}" type="text" value="${currentKeyword}"
+      style="font-size:14px;font-weight:600;color:var(--navy);background:var(--bg-input);border:1.5px solid var(--teal);border-radius:6px;padding:3px 8px;outline:none;width:140px;font-family:inherit;"
+      onkeydown="if(event.key==='Enter')confirmEditKeyword('${cardId}');if(event.key==='Escape')cancelEditKeyword('${cardId}','${currentKeyword.replace(/'/g,"\\'")}');"
+    />
+    <button class="btn-sm btn-accent" onclick="confirmEditKeyword('${cardId}')" style="margin-left:4px">확인</button>
+    <button class="btn-sm" onclick="cancelEditKeyword('${cardId}','${currentKeyword.replace(/'/g,"\\'")}')">취소</button>
+  `;
+  document.getElementById(`kw-input-${cardId}`)?.focus();
+}
+
+async function confirmEditKeyword(cardId) {
+  const input = document.getElementById(`kw-input-${cardId}`);
+  if (!input) return;
+  const newKeyword = input.value.trim();
+  if (!newKeyword) return;
+
+  const textEl  = document.getElementById(`kw-text-${cardId}`);
+  const badgeEl = document.getElementById(`kw-badge-${cardId}`);
+
+  // 텍스트 업데이트
+  textEl.innerHTML = `<span class="keyword-text">${newKeyword}</span>
+    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${newKeyword.replace(/'/g,"\\'")}')">✏️</button>`;
+
+  // 배지 로딩
+  if (badgeEl) badgeEl.innerHTML = `<span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">조회중...</span>`;
+
+  // 재조회
+  const volData = await fetchNaverSearchVolume([newKeyword]);
+  if (badgeEl) badgeEl.innerHTML = volBadge(volData, newKeyword);
+}
+
+function cancelEditKeyword(cardId, originalKeyword) {
+  const textEl = document.getElementById(`kw-text-${cardId}`);
+  if (!textEl) return;
+  textEl.innerHTML = `<span class="keyword-text">${originalKeyword}</span>
+    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${originalKeyword.replace(/'/g,"\\'")}')">✏️</button>`;
+}
+
 // ===== 블랙키위 이미지 입력 관련 변수 =====
 let blackkiwiImageFile = null;
 
@@ -322,7 +368,7 @@ async function filterTistoryKeywords() {
   }
 }
 
-// ===== 필터링 결과 렌더링 (메인 키워드만 검색량 조회) =====
+// ===== 필터링 결과 렌더링 =====
 async function renderFilteredKeywords(data) {
   const box      = document.getElementById('tistoryKeywordResult');
   const filtered = data.filtered || [];
@@ -340,10 +386,8 @@ async function renderFilteredKeywords(data) {
   box.innerHTML = `<div class="card-title">검색량 조회 중... <span style="font-size:11px;color:var(--text-muted);font-weight:400">네이버 검색광고 API</span></div>`;
   box.style.display = 'block';
 
-  // 메인 키워드만 검색량 조회
   const mainKeywords = filtered.map(k => k.main);
   const volData = await fetchNaverSearchVolume(mainKeywords);
-
   const allKeywords = filtered.flatMap(k => [k.main, ...k.derivatives]);
 
   const catColors = {
@@ -369,17 +413,22 @@ async function renderFilteredKeywords(data) {
 
     <div class="keyword-grid">
       ${filtered.map((k, i) => {
+        const cardId  = `card-${i}`;
         const color   = catColors[k.category] || '#1c2b4a';
         const catName = catNames[k.category]  || k.category;
+        const escaped = k.main.replace(/'/g, "\\'");
         return `
         <div class="keyword-card">
           <div class="keyword-main">
             <span class="keyword-num">${String(i+1).padStart(2,'0')}</span>
-            <span class="keyword-text">${k.main}</span>
+            <span id="kw-text-${cardId}">
+              <span class="keyword-text">${k.main}</span>
+              <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${escaped}')">✏️</button>
+            </span>
             <span style="font-size:10px;font-family:var(--font-mono);color:${color};background:${color}18;padding:2px 7px;border-radius:20px;border:1px solid ${color}30">${catName}</span>
-            <button class="btn-sm" onclick="navigator.clipboard.writeText('${k.main}').then(()=>showToast('복사됨!'))">복사</button>
+            <button class="btn-sm" onclick="navigator.clipboard.writeText('${escaped}').then(()=>showToast('복사됨!'))">복사</button>
           </div>
-          <div style="margin:4px 0 6px 0">${volBadge(volData, k.main)}</div>
+          <div id="kw-badge-${cardId}" style="margin:4px 0 6px 0">${volBadge(volData, k.main)}</div>
           <div class="keyword-reason">${k.reason}</div>
           <div class="keyword-derivatives">
             ${k.derivatives.map(d => `
