@@ -3,18 +3,10 @@ const crypto = require('crypto');
 function parseQcCnt(val) {
   if (typeof val === 'number') return val;
   if (typeof val === 'string') {
-    if (val.includes('<')) return 5; // "< 10" → 5로 처리
+    if (val.includes('<')) return 5;
     return parseInt(val) || 0;
   }
   return 0;
-}
-
-function isValidKeyword(keyword) {
-  if (!keyword || typeof keyword !== 'string') return false;
-  const trimmed = keyword.trim();
-  if (trimmed.length === 0 || trimmed.length > 25) return false;
-  if (/[!@#$%^&*()+=\[\]{};':"\\|,.<>\/?]/.test(trimmed)) return false;
-  return true;
 }
 
 module.exports = async function handler(req, res) {
@@ -35,11 +27,9 @@ module.exports = async function handler(req, res) {
   const results = {};
 
   for (const keyword of keywords) {
-    if (!isValidKeyword(keyword)) {
-      console.log('skipped:', keyword);
-      continue;
-    }
+    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) continue;
 
+    const kw = keyword.trim();
     const timestamp = Date.now().toString();
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(timestamp);
@@ -50,7 +40,7 @@ module.exports = async function handler(req, res) {
     const signature = hmac.digest('base64');
 
     const params = new URLSearchParams({
-      hintKeywords: keyword.trim(),
+      hintKeywords: kw,
       showDetail: '1'
     });
 
@@ -69,15 +59,17 @@ module.exports = async function handler(req, res) {
       const data = await response.json();
 
       if (data.keywordList && data.keywordList.length > 0) {
-        const exact = data.keywordList.find(k => k.relKeyword === keyword.trim());
+        const exact = data.keywordList.find(k => k.relKeyword === kw);
         const item  = exact || data.keywordList[0];
         const pc = parseQcCnt(item.monthlyPcQcCnt);
         const mo = parseQcCnt(item.monthlyMobileQcCnt);
-        results[keyword] = { pc, mobile: mo, total: pc + mo };
+        results[kw] = { pc, mobile: mo, total: pc + mo };
+      } else {
+        results[kw] = { pc: 0, mobile: 0, total: 0 };
       }
     } catch (e) {
-      console.error('keyword error:', keyword, e.message);
-      results[keyword] = null;
+      console.error('keyword error:', kw, e.message);
+      results[kw] = null;
     }
   }
 
