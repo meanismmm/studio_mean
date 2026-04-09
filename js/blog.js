@@ -144,20 +144,33 @@ function volBadge(volData, keyword) {
   return `<span style="font-size:10px;font-family:var(--font-mono);color:${color};background:${color}18;padding:2px 8px;border-radius:20px;border:1px solid ${color}30">🔍 ${formatVol(total)} (PC ${formatVol(v.pc)} / 모 ${formatVol(v.mobile)})</span>`;
 }
 
+// ===== 팩트 수집 (Claude web_search via Vercel) =====
+async function fetchKeywordFacts(keyword) {
+  try {
+    const response = await fetch('/api/claude-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword })
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (e) {
+    return null;
+  }
+}
+
 // ===== 메인 키워드 인라인 편집 + 재조회 =====
 function editMainKeyword(cardId, currentKeyword) {
-  const textEl  = document.getElementById(`kw-text-${cardId}`);
-  const badgeEl = document.getElementById(`kw-badge-${cardId}`);
+  const textEl = document.getElementById(`kw-text-${cardId}`);
   if (!textEl) return;
-
-  // 편집 모드로 전환
+  const escaped = currentKeyword.replace(/'/g, "\\'");
   textEl.innerHTML = `
     <input id="kw-input-${cardId}" type="text" value="${currentKeyword}"
       style="font-size:14px;font-weight:600;color:var(--navy);background:var(--bg-input);border:1.5px solid var(--teal);border-radius:6px;padding:3px 8px;outline:none;width:140px;font-family:inherit;"
-      onkeydown="if(event.key==='Enter')confirmEditKeyword('${cardId}');if(event.key==='Escape')cancelEditKeyword('${cardId}','${currentKeyword.replace(/'/g,"\\'")}');"
+      onkeydown="if(event.key==='Enter')confirmEditKeyword('${cardId}');if(event.key==='Escape')cancelEditKeyword('${cardId}','${escaped}');"
     />
     <button class="btn-sm btn-accent" onclick="confirmEditKeyword('${cardId}')" style="margin-left:4px">확인</button>
-    <button class="btn-sm" onclick="cancelEditKeyword('${cardId}','${currentKeyword.replace(/'/g,"\\'")}')">취소</button>
+    <button class="btn-sm" onclick="cancelEditKeyword('${cardId}','${escaped}')">취소</button>
   `;
   document.getElementById(`kw-input-${cardId}`)?.focus();
 }
@@ -167,18 +180,12 @@ async function confirmEditKeyword(cardId) {
   if (!input) return;
   const newKeyword = input.value.trim();
   if (!newKeyword) return;
-
   const textEl  = document.getElementById(`kw-text-${cardId}`);
   const badgeEl = document.getElementById(`kw-badge-${cardId}`);
-
-  // 텍스트 업데이트
+  const escaped = newKeyword.replace(/'/g, "\\'");
   textEl.innerHTML = `<span class="keyword-text">${newKeyword}</span>
-    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${newKeyword.replace(/'/g,"\\'")}')">✏️</button>`;
-
-  // 배지 로딩
+    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${escaped}')">✏️</button>`;
   if (badgeEl) badgeEl.innerHTML = `<span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">조회중...</span>`;
-
-  // 재조회
   const volData = await fetchNaverSearchVolume([newKeyword]);
   if (badgeEl) badgeEl.innerHTML = volBadge(volData, newKeyword);
 }
@@ -186,8 +193,9 @@ async function confirmEditKeyword(cardId) {
 function cancelEditKeyword(cardId, originalKeyword) {
   const textEl = document.getElementById(`kw-text-${cardId}`);
   if (!textEl) return;
+  const escaped = originalKeyword.replace(/'/g, "\\'");
   textEl.innerHTML = `<span class="keyword-text">${originalKeyword}</span>
-    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${originalKeyword.replace(/'/g,"\\'")}')">✏️</button>`;
+    <button class="btn-sm" style="margin-left:4px;font-size:10px;opacity:0.6" onclick="editMainKeyword('${cardId}','${escaped}')">✏️</button>`;
 }
 
 // ===== 블랙키위 이미지 입력 관련 변수 =====
@@ -322,12 +330,12 @@ async function filterTistoryKeywords() {
 - 음식·요리·맛집 (레시피, 효능, 지역 맛집 등)
 - 육아·교육·학습
 - 여행·관광·축제 (지역 축제, 명소, 여행 정보)
-- 기업·브랜드명이라도 정보성 파생 가능하면 포함 (삼성당제약→효능, 한화아큐→투자)
-- 지역명이 붙은 키워드도 정보성이면 포함 (부동산공동중개, 송파구 맛집 등)
-- 계절·시의성 키워드 (벚꽃 명소, 여름 준비 등)
+- 기업·브랜드명이라도 정보성 파생 가능하면 포함
+- 지역명이 붙은 키워드도 정보성이면 포함
+- 계절·시의성 키워드
 
 남긴 키워드마다:
-1. 파생 키워드 3개 (더 구체적인 롱테일, 실제 검색할 법한 표현)
+1. 파생 키워드 3개 (더 구체적인 롱테일)
 2. 카테고리 (health/food/living/recommend/issue/finance/parenting)
 3. 선정 이유 한 줄 (애드센스 수익 관점에서)
 
@@ -459,7 +467,7 @@ async function renderFilteredKeywords(data) {
   document.getElementById('tistoryStep2').style.display = 'block';
 }
 
-// ===== 파생 키워드 선택 시 검색량 즉시 조회 후 STEP2 입력 =====
+// ===== 파생 키워드 선택 시 검색량 즉시 조회 =====
 async function selectKeywordWithVol(keyword, category) {
   const volEl = document.getElementById(`vol-${CSS.escape(keyword)}`);
   if (volEl) volEl.textContent = '조회중...';
@@ -485,7 +493,7 @@ async function selectKeywordWithVol(keyword, category) {
   showToast(`"${keyword}" 선택됨`);
 }
 
-// ===== STEP 2: 글 생성 =====
+// ===== STEP 2: 팩트 수집 후 글 생성 =====
 async function generateTistoryFromKeyword() {
   const keyword = document.getElementById('tistoryFinalKeyword').value.trim();
   if (!keyword) { showToast('최종 키워드를 입력해주세요'); return; }
@@ -501,8 +509,26 @@ async function generateTistoryFromKeyword() {
     essay:     'daily life society people'
   };
 
-  setLoading('tistoryLoading', true, '블로그 글을 작성 중...');
   document.getElementById('tistoryResult').style.display = 'none';
+
+  // --- 1단계: 팩트 수집 ---
+  setLoading('tistoryLoading', true, '최신 정보를 검색하는 중...');
+  const facts = await fetchKeywordFacts(keyword);
+
+  let factContext = '';
+  if (facts && facts.facts && facts.facts.length > 0) {
+    factContext = `
+[검색으로 확인된 최신 팩트 — 반드시 이 사실들을 기반으로 작성할 것]
+${facts.facts.map((f, i) => `${i+1}. ${f}`).join('\n')}
+
+${facts.caution && facts.caution.length > 0 ? `[주의사항 — 이 내용은 단정 짓지 말 것]\n${facts.caution.join('\n')}` : ''}
+
+[핵심 요약]\n${facts.summary || ''}
+`;
+  }
+
+  // --- 2단계: 글 생성 ---
+  setLoading('tistoryLoading', true, '블로그 글을 작성 중...');
 
   try {
     const result = await callClaude(
@@ -511,12 +537,17 @@ async function generateTistoryFromKeyword() {
 
 다음 키워드로 SEO 최적화된 블로그 글을 작성해주세요: "${keyword}"
 
+${factContext}
+
 [SEO 지시]
 - 제목에 키워드 "${keyword}" 반드시 포함
 - 첫 문단에 키워드 자연스럽게 포함
 - 소제목에 키워드 변형 표현 포함
 - 목차를 반드시 글 상단에 포함
-- 총 분량 준수`,
+- 총 분량 준수
+
+[중요] 위 팩트에 없는 수치·날짜·확정 사실은 절대 지어내지 말 것.
+불확실한 내용은 "~로 알려져 있다", "~할 것으로 보인다" 등으로 표현할 것.`,
       3500
     );
 
@@ -583,7 +614,7 @@ async function recommendPsychTopics() {
   }
 }
 
-// ===== 정신과 주제 렌더링 (검색량 자동 조회) =====
+// ===== 정신과 주제 렌더링 =====
 async function renderPsychTopics(topics) {
   const list = document.getElementById('psychTopicList');
   list.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px 0">검색량 조회 중...</div>`;
