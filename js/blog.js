@@ -110,6 +110,48 @@ const TISTORY_SYSTEM = {
 총 1500~2000자. ## 소제목 외 마크다운 기호 일절 금지.`
 };
 
+// ===== 네이버 검색량 조회 =====
+async function fetchNaverSearchVolume(keywords) {
+  try {
+    const response = await fetch('/api/naver-keyword', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords })
+    });
+    if (!response.ok) return {};
+    const data = await response.json();
+    const result = {};
+    (data.keywordList || []).forEach(item => {
+      const key = item.relKeyword;
+      const pc  = parseInt(item.monthlyPcQcCnt)     || 0;
+      const mo  = parseInt(item.monthlyMobileQcCnt) || 0;
+      result[key] = { pc, mobile: mo, total: pc + mo };
+    });
+    return result;
+  } catch (e) {
+    return {};
+  }
+}
+
+function formatVol(n) {
+  if (n >= 10000) return (n / 10000).toFixed(1) + '만';
+  if (n >= 1000)  return (n / 1000).toFixed(1) + '천';
+  return n.toString();
+}
+
+function volBadge(volData, keyword) {
+  const v = volData[keyword];
+  if (!v) return `<span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">-</span>`;
+  const total = v.total;
+  const color = total >= 50000 ? '#2a7a6a'
+              : total >= 10000 ? '#c8922a'
+              : total >= 1000  ? '#6b5bab'
+              : '#888';
+  return `<span style="font-size:10px;font-family:var(--font-mono);color:${color};background:${color}18;padding:2px 8px;border-radius:20px;border:1px solid ${color}30">
+    🔍 ${formatVol(total)} (PC ${formatVol(v.pc)} / 모 ${formatVol(v.mobile)})
+  </span>`;
+}
+
 // ===== 블랙키위 이미지 입력 관련 변수 =====
 let blackkiwiImageFile = null;
 
@@ -276,7 +318,7 @@ async function filterTistoryKeywords() {
     if (!textBlock?.text) throw new Error('결과를 받지 못했습니다.');
 
     const parsed = safeParseJSON(textBlock.text);
-    renderFilteredKeywords(parsed);
+    await renderFilteredKeywords(parsed);
 
   } catch(e) {
     showToast('오류: ' + e.message);
@@ -285,8 +327,8 @@ async function filterTistoryKeywords() {
   }
 }
 
-// 필터링 결과 렌더링
-function renderFilteredKeywords(data) {
+// ===== 필터링 결과 렌더링 (검색량 자동 조회) =====
+async function renderFilteredKeywords(data) {
   const box      = document.getElementById('tistoryKeywordResult');
   const filtered = data.filtered || [];
   const removed  = data.removed  || [];
@@ -300,7 +342,12 @@ function renderFilteredKeywords(data) {
     return;
   }
 
+  // 검색량 조회 (메인 + 파생 전체)
   const allKeywords = filtered.flatMap(k => [k.main, ...k.derivatives]);
+  box.innerHTML = `<div class="card-title">검색량 조회 중... <span style="font-size:11px;color:var(--text-muted);font-weight:400">네이버 검색광고 API</span></div>`;
+  box.style.display = 'block';
+
+  const volData = await fetchNaverSearchVolume(allKeywords);
 
   const catColors = {
     health:'#2a7a6a', food:'#c8922a', living:'#6b5bab',
@@ -323,13 +370,6 @@ function renderFilteredKeywords(data) {
       </div>
     </div>
 
-    <div style="background:var(--gold-dim);border:1px solid rgba(200,146,42,0.2);border-radius:8px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--text-secondary);line-height:1.7">
-      📌 아래 키워드를 <strong style="color:var(--navy)">네이버</strong>에서 검색하세요.<br>
-      ① 파워링크(광고) 존재 확인 &nbsp;|&nbsp;
-      ② <a href="https://searchad.naver.com" target="_blank" style="color:var(--navy-light);font-weight:600">네이버 키워드 도구</a>에서 월간 조회수 확인<br>
-      <strong style="color:var(--teal)">조회수 5만+ + 파워링크 있음</strong> → 파생 키워드 옆 <strong>선택</strong> 클릭
-    </div>
-
     <div class="keyword-grid">
       ${filtered.map((k, i) => {
         const color   = catColors[k.category] || '#1c2b4a';
@@ -342,15 +382,19 @@ function renderFilteredKeywords(data) {
             <span style="font-size:10px;font-family:var(--font-mono);color:${color};background:${color}18;padding:2px 7px;border-radius:20px;border:1px solid ${color}30">${catName}</span>
             <button class="btn-sm" onclick="navigator.clipboard.writeText('${k.main}').then(()=>showToast('복사됨!'))">복사</button>
           </div>
+          <div style="margin:4px 0 6px 0">${volBadge(volData, k.main)}</div>
           <div class="keyword-reason">${k.reason}</div>
           <div class="keyword-derivatives">
             ${k.derivatives.map(d => `
               <div class="keyword-derivative">
                 <span>↳ ${d}</span>
-                <button class="btn-sm btn-accent"
-                  onclick="selectKeyword('${d.replace(/'/g,"\\'")}', '${k.category}')">
-                  선택
-                </button>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  ${volBadge(volData, d)}
+                  <button class="btn-sm btn-accent"
+                    onclick="selectKeyword('${d.replace(/'/g,"\\'")}', '${k.category}')">
+                    선택
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
@@ -369,7 +413,7 @@ function renderFilteredKeywords(data) {
   document.getElementById('tistoryStep2').style.display = 'block';
 }
 
-// 파생 키워드 선택 → STEP 2 자동 입력
+// ===== 파생 키워드 선택 → STEP 2 자동 입력 =====
 function selectKeyword(keyword, category) {
   document.getElementById('tistoryFinalKeyword').value = keyword;
   document.getElementById('tistoryStep2Category').value = category;
@@ -377,7 +421,7 @@ function selectKeyword(keyword, category) {
   showToast(`"${keyword}" 선택됨`);
 }
 
-// STEP 2: 글 생성 (API 1회)
+// ===== STEP 2: 글 생성 (API 1회) =====
 async function generateTistoryFromKeyword() {
   const keyword = document.getElementById('tistoryFinalKeyword').value.trim();
   if (!keyword) { showToast('최종 키워드를 입력해주세요'); return; }
@@ -429,7 +473,7 @@ async function generateTistoryFromKeyword() {
   }
 }
 
-// 페이지 로드 시 초기화
+// ===== 페이지 로드 시 초기화 =====
 document.addEventListener('DOMContentLoaded', initBlackkiwiUpload);
 
 
@@ -467,7 +511,7 @@ async function recommendPsychTopics() {
     const topics = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
     const updated = [...new Set([...savedExclude, ...topics])].slice(-100);
     localStorage.setItem('psych_used_topics', JSON.stringify(updated));
-    renderPsychTopics(topics);
+    await renderPsychTopics(topics);
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
@@ -475,16 +519,29 @@ async function recommendPsychTopics() {
   }
 }
 
-function renderPsychTopics(topics) {
+// ===== 정신과 주제 렌더링 (검색량 자동 조회) =====
+async function renderPsychTopics(topics) {
   const list = document.getElementById('psychTopicList');
-  list.innerHTML = '';
+  list.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px 0">검색량 조회 중...</div>`;
+  document.getElementById('psychTopicCard').style.display = 'block';
 
+  // 제목에서 핵심 키워드 추출 (괄호·특수문자 제거 후 앞 3단어)
+  const keywords = topics.map(t =>
+    t.replace(/[^\uAC00-\uD7A3\u1100-\u11FF\w\s]/g, '').trim().split(' ').slice(0, 3).join(' ')
+  );
+  const volData = await fetchNaverSearchVolume(keywords);
+
+  list.innerHTML = '';
   topics.forEach((title, i) => {
+    const kw   = keywords[i];
     const item = document.createElement('div');
     item.className = 'topic-item';
     item.innerHTML = `
       <div class="topic-num">${String(i+1).padStart(2,'0')}</div>
-      <div><div class="topic-title">${title}</div></div>`;
+      <div style="flex:1">
+        <div class="topic-title">${title}</div>
+        <div style="margin-top:4px">${volBadge(volData, kw)}</div>
+      </div>`;
     item.addEventListener('click', () => generatePsychPost(title));
     list.appendChild(item);
   });
