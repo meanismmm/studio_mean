@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   });
 
   try {
-    const response = await fetch(`https://api.naver.com/keywordstool?${params}`, {
+    const response = await fetch(`https://api.searchad.naver.com/keywordstool?${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json; charset=UTF-8',
