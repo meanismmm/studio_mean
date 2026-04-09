@@ -16,10 +16,15 @@ export default async function handler(req, res) {
   const customerId = process.env.NAVER_CUSTOMER_ID;
 
   const timestamp = Date.now().toString();
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${timestamp}\nGET\n/keywordstool`)
-    .digest('base64');
+
+  // 네이버 공식 서명 방식: timestamp + "." + method + "." + path
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(timestamp);
+  hmac.update('.');
+  hmac.update('GET');
+  hmac.update('.');
+  hmac.update('/keywordstool');
+  const signature = hmac.digest('base64');
 
   const params = new URLSearchParams({
     hintKeywords: keywords.join(','),
@@ -30,11 +35,11 @@ export default async function handler(req, res) {
     const response = await fetch(`https://api.naver.com/keywordstool?${params}`, {
       method: 'GET',
       headers: {
-        'Content-Type':  'application/json; charset=UTF-8',
-        'X-Timestamp':   timestamp,
-        'X-API-KEY':     license,
-        'X-Customer':    customerId,
-        'X-Signature':   signature,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Timestamp':  timestamp,
+        'X-API-KEY':    license,
+        'X-Customer':   customerId,
+        'X-Signature':  signature,
       }
     });
 
