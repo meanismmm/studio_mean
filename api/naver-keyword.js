@@ -15,37 +15,51 @@ export default async function handler(req, res) {
   const secret     = process.env.NAVER_API_SECRET;
   const customerId = process.env.NAVER_CUSTOMER_ID;
 
-  const timestamp = Date.now().toString();
+  const results = {};
 
-  // 네이버 공식 서명 방식: timestamp + "." + method + "." + path
-  const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(timestamp);
-  hmac.update('.');
-  hmac.update('GET');
-  hmac.update('.');
-  hmac.update('/keywordstool');
-  const signature = hmac.digest('base64');
+  for (const keyword of keywords) {
+    const timestamp = Date.now().toString();
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(timestamp);
+    hmac.update('.');
+    hmac.update('GET');
+    hmac.update('.');
+    hmac.update('/keywordstool');
+    const signature = hmac.digest('base64');
 
-  const params = new URLSearchParams({
-    hintKeywords: keywords.join(','),
-    showDetail: '1'
-  });
-
-  try {
-    const response = await fetch(`https://api.searchad.naver.com/keywordstool?${params}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Timestamp':  timestamp,
-        'X-API-KEY':    license,
-        'X-Customer':   customerId,
-        'X-Signature':  signature,
-      }
+    const params = new URLSearchParams({
+      hintKeywords: keyword,
+      showDetail: '1'
     });
 
-    const data = await response.json();
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    try {
+      const response = await fetch(`https://api.searchad.naver.com/keywordstool?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Timestamp':  timestamp,
+          'X-API-KEY':    license,
+          'X-Customer':   customerId,
+          'X-Signature':  signature,
+        }
+      });
+
+      const data = await response.json();
+      const list = data.keywordList || [];
+
+      // 입력 키워드와 정확히 일치하는 항목 먼저 찾고, 없으면 첫 번째 항목 사용
+      const exact = list.find(k => k.relKeyword === keyword);
+      const item  = exact || list[0];
+
+      if (item) {
+        const pc = parseInt(item.monthlyPcQcCnt)     || 0;
+        const mo = parseInt(item.monthlyMobileQcCnt) || 0;
+        results[keyword] = { pc, mobile: mo, total: pc + mo };
+      }
+    } catch (e) {
+      // 개별 키워드 실패 시 무시
+    }
   }
+
+  res.status(200).json(results);
 }
