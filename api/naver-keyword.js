@@ -57,9 +57,9 @@ export default async function handler(req, res) {
         results[keyword] = { pc, mobile: mo, total: pc + mo };
       }
     } catch (e) {
-      // 개별 키워드 실패 시 무시
+      console.error('keyword error:', keyword, e.message);
+      results[keyword] = null;
     }
-  }
 
   res.status(200).json(results);
 }
