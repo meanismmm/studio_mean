@@ -246,7 +246,7 @@ async function filterTistoryKeywords() {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        system: `당신은 티스토리 블로그 키워드 전략가입니다. 반드시 순수 JSON만 반환하세요.`,
+        system: `당신은 티스토리 애드센스 블로그 키워드 전략가입니다. 반드시 순수 JSON만 반환하세요.`,
         messages: [{
           role: 'user',
           content: [
@@ -261,21 +261,29 @@ async function filterTistoryKeywords() {
 위 이미지는 블랙키위 일간 트렌드 키워드 화면입니다.
 이미지에서 키워드 텍스트를 모두 읽어낸 뒤, 아래 기준으로 필터링하세요.
 
-[제거할 키워드]
-- 연예인·인물 이름 (가수, 배우, 운동선수, 정치인 등)
-- 연예·방송·음악 관련 (드라마, 예능, 앨범, 콘서트 등)
-- 단발성 사건·사고 (특정 기업 실적, 주가, 사건사고)
-- 지역 특정 행사·이슈 / 스포츠 경기 결과
-- 숫자만 있는 항목 (+5.7천, 32 등)
+[반드시 제거할 것 — 이것만 제거, 그 외는 최대한 남길 것]
+1. 사람 이름 (연예인·운동선수·정치인·유명인 등 인물)
+2. 순수 연예/오락 콘텐츠 (드라마 제목·앨범명·콘서트·팬덤 용어)
+3. 특정 스포츠 경기 결과 (KBO 오늘 경기, 리그 순위 등 경기 자체)
+4. 숫자·기호만으로 된 항목 (+5.7천, 32 등)
+5. 중복 키워드 (같은 키워드가 여러 번 나오면 1개만)
 
-[남길 키워드]
-- 정보성 검색 가능 (방법, 이유, 효과, 비용 등으로 파생 가능)
-- 생활·건강·금융·육아·정책·제도 등 일상 밀착 정보성
+[반드시 남길 것 — 아래 유형은 무조건 포함]
+- 정책·제도·법령 (법정공휴일, 차량5부제, 부동산 규제 등)
+- 건강·의료·약품 (증상, 효능, 부작용, 치료법 등)
+- 생활·절약·소비 (할인, 혜택, 신청방법 등)
+- 금융·투자·부동산 (금리, 청약, 매매, 주식 등)
+- 음식·요리·맛집 (레시피, 효능, 지역 맛집 등)
+- 육아·교육·학습
+- 여행·관광·축제 (지역 축제, 명소, 여행 정보)
+- 기업·브랜드명이라도 정보성 파생 가능하면 포함 (삼성당제약→효능, 한화아큐→투자)
+- 지역명이 붙은 키워드도 정보성이면 포함 (부동산공동중개, 송파구 맛집 등)
+- 계절·시의성 키워드 (벚꽃 명소, 여름 준비 등)
 
 남긴 키워드마다:
-1. 2~3차 파생 키워드 3개 (더 구체적인 롱테일)
+1. 파생 키워드 3개 (더 구체적인 롱테일, 실제 검색할 법한 표현)
 2. 카테고리 (health/food/living/recommend/issue/finance/parenting)
-3. 선정 이유 한 줄
+3. 선정 이유 한 줄 (애드센스 수익 관점에서)
 
 반드시 순수 JSON으로만:
 {
@@ -375,7 +383,7 @@ async function renderFilteredKeywords(data) {
           <div class="keyword-reason">${k.reason}</div>
           <div class="keyword-derivatives">
             ${k.derivatives.map(d => `
-              <div class="keyword-derivative" id="deriv-${CSS.escape(d)}">
+              <div class="keyword-derivative">
                 <span>↳ ${d}</span>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                   <span id="vol-${CSS.escape(d)}" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">-</span>
@@ -404,11 +412,9 @@ async function renderFilteredKeywords(data) {
 
 // ===== 파생 키워드 선택 시 검색량 즉시 조회 후 STEP2 입력 =====
 async function selectKeywordWithVol(keyword, category) {
-  // 배지 로딩 표시
   const volEl = document.getElementById(`vol-${CSS.escape(keyword)}`);
   if (volEl) volEl.textContent = '조회중...';
 
-  // 검색량 조회
   const volData = await fetchNaverSearchVolume([keyword]);
   const v = volData[keyword];
 
@@ -424,7 +430,6 @@ async function selectKeywordWithVol(keyword, category) {
     }
   }
 
-  // STEP2 자동 입력
   document.getElementById('tistoryFinalKeyword').value = keyword;
   document.getElementById('tistoryStep2Category').value = category;
   document.getElementById('tistoryStep2').scrollIntoView({ behavior: 'smooth', block: 'center' });
