@@ -110,7 +110,7 @@ const TISTORY_SYSTEM = {
 총 1500~2000자. ## 소제목 외 마크다운 기호 일절 금지.`
 };
 
-// ===== 네이버 검색량 조회 (메인 키워드만) =====
+// ===== 네이버 검색량 조회 =====
 async function fetchNaverSearchVolume(keywords) {
   try {
     const response = await fetch('/api/naver-keyword', {
@@ -375,12 +375,15 @@ async function renderFilteredKeywords(data) {
           <div class="keyword-reason">${k.reason}</div>
           <div class="keyword-derivatives">
             ${k.derivatives.map(d => `
-              <div class="keyword-derivative">
+              <div class="keyword-derivative" id="deriv-${CSS.escape(d)}">
                 <span>↳ ${d}</span>
-                <button class="btn-sm btn-accent"
-                  onclick="selectKeyword('${d.replace(/'/g,"\\'")}', '${k.category}')">
-                  선택
-                </button>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <span id="vol-${CSS.escape(d)}" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">-</span>
+                  <button class="btn-sm btn-accent"
+                    onclick="selectKeywordWithVol('${d.replace(/'/g,"\\'")}', '${k.category}')">
+                    선택
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
@@ -399,8 +402,29 @@ async function renderFilteredKeywords(data) {
   document.getElementById('tistoryStep2').style.display = 'block';
 }
 
-// ===== 파생 키워드 선택 → STEP 2 자동 입력 =====
-function selectKeyword(keyword, category) {
+// ===== 파생 키워드 선택 시 검색량 즉시 조회 후 STEP2 입력 =====
+async function selectKeywordWithVol(keyword, category) {
+  // 배지 로딩 표시
+  const volEl = document.getElementById(`vol-${CSS.escape(keyword)}`);
+  if (volEl) volEl.textContent = '조회중...';
+
+  // 검색량 조회
+  const volData = await fetchNaverSearchVolume([keyword]);
+  const v = volData[keyword];
+
+  if (volEl) {
+    if (v && v.total > 0) {
+      const color = v.total >= 50000 ? '#2a7a6a'
+                  : v.total >= 10000 ? '#c8922a'
+                  : v.total >= 1000  ? '#6b5bab'
+                  : '#888';
+      volEl.innerHTML = `<span style="color:${color};background:${color}18;padding:2px 8px;border-radius:20px;border:1px solid ${color}30">🔍 ${formatVol(v.total)} (PC ${formatVol(v.pc)} / 모 ${formatVol(v.mobile)})</span>`;
+    } else {
+      volEl.textContent = '검색량 미미';
+    }
+  }
+
+  // STEP2 자동 입력
   document.getElementById('tistoryFinalKeyword').value = keyword;
   document.getElementById('tistoryStep2Category').value = category;
   document.getElementById('tistoryStep2').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -511,7 +535,6 @@ async function renderPsychTopics(topics) {
   list.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px 0">검색량 조회 중...</div>`;
   document.getElementById('psychTopicCard').style.display = 'block';
 
-  // 제목에서 핵심 키워드 추출 (앞 3단어)
   const keywords = topics.map(t =>
     t.replace(/[^\uAC00-\uD7A3\u1100-\u11FF\w\s]/g, '').trim().split(' ').slice(0, 3).join(' ')
   );
