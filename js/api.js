@@ -1,10 +1,39 @@
-// ===== api.js — Claude API 공통 모듈 =====
+// ===== api.js — Claude API 공통 모듈 (Gemini 폴백 포함) =====
 
+// ===== Gemini 폴백 =====
+async function callGemini(systemPrompt, userPrompt, maxTokens = 2000) {
+  const apiKey = localStorage.getItem('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig: { maxOutputTokens: maxTokens }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Gemini 오류 (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ===== Claude → Gemini 자동 폴백 =====
 async function callClaude(systemPrompt, userPrompt, maxTokens = 2000) {
   const apiKey = localStorage.getItem('CLAUDE_API_KEY');
   if (!apiKey) {
     throw new Error('Claude API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
   }
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -21,9 +50,20 @@ async function callClaude(systemPrompt, userPrompt, maxTokens = 2000) {
     })
   });
 
+  // 크레딧 부족 시 Gemini로 폴백
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API 오류 (${response.status})`);
+    const msg = err.error?.message || '';
+
+    if (msg.includes('credit') || msg.includes('balance') || response.status === 529) {
+      const geminiKey = localStorage.getItem('GEMINI_API_KEY');
+      if (geminiKey) {
+        showToast('⚠️ Claude 잔액 부족 — Gemini로 대체 중...');
+        return await callGemini(systemPrompt, userPrompt, maxTokens);
+      }
+    }
+
+    throw new Error(msg || `API 오류 (${response.status})`);
   }
 
   const data = await response.json();
@@ -52,10 +92,10 @@ async function searchPexels(query, count = 5) {
   }
 }
 
-// Pexels 이미지 목록 렌더링
+// ===== Pexels 이미지 목록 렌더링 =====
 async function renderPexelsImages(query, listElementId, wrapperElementId) {
   const wrapper = document.getElementById(wrapperElementId);
-  const list = document.getElementById(listElementId);
+  const list    = document.getElementById(listElementId);
   if (!wrapper || !list) return;
 
   wrapper.style.display = 'block';
@@ -93,10 +133,10 @@ function safeParseJSON(text) {
 
 // ===== 날짜/시의성 컨텍스트 =====
 function getTodayContext() {
-  const now = new Date();
-  const year = now.getFullYear();
+  const now   = new Date();
+  const year  = now.getFullYear();
   const month = now.getMonth() + 1;
-  const day = now.getDate();
+  const day   = now.getDate();
   const dateStr = `${year}년 ${month}월 ${day}일`;
 
   const seasonMap = {
@@ -121,12 +161,5 @@ function getTodayContext() {
     12:'연말 과음 과식 회복, 겨울 면역력, 연말 다이어트, 새해 건강 준비'
   };
 
-  return {
-    dateStr,
-    year,
-    month,
-    day,
-    season: seasonMap[month],
-    monthlyKeywords: monthlyKeywords[month]
-  };
+  return { dateStr, year, month, day, season: seasonMap[month], monthlyKeywords: monthlyKeywords[month] };
 }
