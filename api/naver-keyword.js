@@ -60,6 +60,6 @@ module.exports = async function handler(req, res) {
       console.error('keyword error:', keyword, e.message);
       results[keyword] = null;
     }
-
+  }
   res.status(200).json(results);
 }
