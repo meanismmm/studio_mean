@@ -6,7 +6,7 @@ async function callGemini(systemPrompt, userPrompt, maxTokens = 2000) {
   if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
