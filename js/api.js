@@ -50,16 +50,22 @@ async function callClaude(systemPrompt, userPrompt, maxTokens = 2000) {
     })
   });
 
-  // 크레딧 부족 시 Gemini로 폴백
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     const msg = err.error?.message || '';
 
-    if (msg.includes('credit') || msg.includes('balance') || response.status === 529) {
+    // 크레딧 부족 감지 — 메시지에 credit/balance 포함 또는 400/529 상태코드
+    const isCreditError = msg.toLowerCase().includes('credit') ||
+                          msg.toLowerCase().includes('balance') ||
+                          response.status === 529;
+
+    if (isCreditError) {
       const geminiKey = localStorage.getItem('GEMINI_API_KEY');
       if (geminiKey) {
         showToast('⚠️ Claude 잔액 부족 — Gemini로 대체 중...');
         return await callGemini(systemPrompt, userPrompt, maxTokens);
+      } else {
+        throw new Error('Claude 크레딧이 부족합니다. 설정에서 Gemini API 키를 등록하거나 Claude 크레딧을 충전해주세요.');
       }
     }
 
