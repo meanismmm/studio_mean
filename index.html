@@ -10,7 +10,6 @@
 </head>
 <body>
 
-  <!-- 스플래시 화면 -->
   <div class="splash" id="splash">
     <div class="splash-logo">Studio Mean</div>
     <div class="splash-quote">
@@ -72,8 +71,6 @@
         <div class="panel-body">
           <div class="two-col">
             <div class="col">
-
-              <!-- STEP 1 -->
               <div class="card">
                 <div class="card-title">
                   STEP 1 — 상세페이지 스크린샷
@@ -82,7 +79,6 @@
                     <button class="btn-sm" onclick="resetCoupangImages()" style="font-size:10px">초기화</button>
                   </div>
                 </div>
-
                 <div class="dropzone" id="coupangDropzone">
                   <div class="dropzone-inner">
                     <span class="dropzone-icon">📋</span>
@@ -91,76 +87,40 @@
                   </div>
                 </div>
                 <input type="file" id="coupangImageInput" accept="image/*" multiple style="display:none" />
-
                 <div class="image-preview-row" id="coupangImagePreview" style="display:none"></div>
-
                 <button class="btn btn-primary" id="coupangAnalyzeBtn"
                   style="display:none;margin-top:12px" onclick="analyzeCoupangImages()">
                   <span>🔍 상품 정보 분석</span>
                 </button>
               </div>
-
-              <!-- STEP 2: 추출 결과 -->
-              <div class="card" id="coupangExtractResult" style="display:none">
-                <!-- JS 렌더링 -->
-              </div>
-
-              <!-- STEP 3: 생성 옵션 -->
+              <div class="card" id="coupangExtractResult" style="display:none"></div>
               <div class="card" id="coupangOptionsCard" style="display:none">
                 <div class="card-title">STEP 3 — 생성 옵션</div>
-
                 <div class="form-group">
                   <label>생성 유형</label>
                   <div class="radio-group">
-                    <label class="radio-label">
-                      <input type="radio" name="coupangType" value="blog" checked />
-                      블로그 홍보글
-                      <span class="radio-desc">티스토리/네이버 발행용 상세 글</span>
-                    </label>
-                    <label class="radio-label">
-                      <input type="radio" name="coupangType" value="threads" />
-                      스레드 포스트
-                      <span class="radio-desc">스레드 최적화 짧은 홍보글</span>
-                    </label>
-                    <label class="radio-label">
-                      <input type="radio" name="coupangType" value="both" />
-                      둘 다 생성
-                    </label>
+                    <label class="radio-label"><input type="radio" name="coupangType" value="blog" checked />블로그 홍보글<span class="radio-desc">티스토리/네이버 발행용 상세 글</span></label>
+                    <label class="radio-label"><input type="radio" name="coupangType" value="threads" />스레드 포스트<span class="radio-desc">스레드 최적화 짧은 홍보글</span></label>
+                    <label class="radio-label"><input type="radio" name="coupangType" value="both" />둘 다 생성</label>
                   </div>
                 </div>
-
                 <div class="form-group">
                   <label>홍보 스타일</label>
                   <div class="radio-group">
-                    <label class="radio-label">
-                      <input type="radio" name="coupangStyle" value="pain" checked />
-                      PAIN형
-                      <span class="radio-desc">문제 공감 → 해결책 제시</span>
-                    </label>
-                    <label class="radio-label">
-                      <input type="radio" name="coupangStyle" value="wow" />
-                      WOW형
-                      <span class="radio-desc">놀라운 혜택 → 구매 충동</span>
-                    </label>
+                    <label class="radio-label"><input type="radio" name="coupangStyle" value="pain" checked />PAIN형<span class="radio-desc">문제 공감 → 해결책 제시</span></label>
+                    <label class="radio-label"><input type="radio" name="coupangStyle" value="wow" />WOW형<span class="radio-desc">놀라운 혜택 → 구매 충동</span></label>
                   </div>
                 </div>
-
-                <button class="btn btn-primary" onclick="generateCoupangContent()">
-                  <span>✍️ 홍보글 생성</span>
-                </button>
+                <button class="btn btn-primary" onclick="generateCoupangContent()"><span>✍️ 홍보글 생성</span></button>
               </div>
-
             </div>
-
             <div class="col">
               <div class="loading-card" id="coupangLoading" style="display:none">
                 <div class="spinner"></div>
                 <p id="coupangLoadingText">분석 중입니다...</p>
               </div>
-
               <div class="card result-card" id="coupangBlogResult" style="display:none">
-                <div class="card-title">
-                  블로그 홍보글
+                <div class="card-title">블로그 홍보글
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyResult('coupangBlogOutput')">전체 복사</button>
                     <button class="btn-sm btn-accent" onclick="sendToThreads('coupangBlogOutput', 'coupang')">🧵 스레드로</button>
@@ -173,10 +133,8 @@
                   <div id="coupangImageList"></div>
                 </div>
               </div>
-
               <div class="card result-card" id="coupangThreadsResult" style="display:none">
-                <div class="card-title">
-                  스레드 포스트
+                <div class="card-title">스레드 포스트
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyAllThreads('coupangThreadsList')">전체 복사</button>
                   </div>
@@ -203,9 +161,7 @@
                   <label>제외 주제 <span class="optional">(이미 작성한 주제, 줄바꿈으로 구분)</span></label>
                   <textarea id="psychExclude" rows="4" placeholder="월경전불쾌장애&#10;정신과 진료 기록&#10;기분부전장애"></textarea>
                 </div>
-                <button class="btn btn-primary" onclick="recommendPsychTopics()">
-                  <span>주제 추천 (5개)</span>
-                </button>
+                <button class="btn btn-primary" onclick="recommendPsychTopics()"><span>주제 추천 (5개)</span></button>
               </div>
               <div class="card" id="psychTopicCard" style="display:none">
                 <div class="card-title">추천 주제 — 선택하세요</div>
@@ -218,8 +174,7 @@
                 <p id="psychLoadingText">블로그 글을 작성 중입니다...</p>
               </div>
               <div class="card result-card" id="psychResult" style="display:none">
-                <div class="card-title">
-                  생성된 블로그 글
+                <div class="card-title">생성된 블로그 글
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyResult('psychOutput')">전체 복사</button>
                     <button class="btn-sm btn-accent" onclick="sendToThreads('psychOutput', 'psych')">🧵 스레드로</button>
@@ -241,36 +196,75 @@
       <section class="tab-panel" id="tab-tistory">
         <div class="panel-header">
           <h1>티스토리 블로그</h1>
-          <p>블랙키위 트렌드 화면을 캡처해서 붙여넣으면 AI가 읽고 필터링합니다</p>
+          <p>블랙키위 스크린샷 또는 키워드 직접 입력으로 블로그 글을 생성합니다</p>
         </div>
         <div class="panel-body">
           <div class="two-col">
-
             <div class="col">
 
               <!-- STEP 1 -->
               <div class="card">
-                <div class="card-title">STEP 1 — 블랙키위 스크린샷</div>
-                <div class="dropzone" id="blackkiwiDropzone">
-                  <div class="dropzone-inner">
-                    <span class="dropzone-icon">📋</span>
-                    <p class="dropzone-text">Ctrl+V 붙여넣기 / 클릭 업로드 / 드래그앤드롭</p>
-                    <p class="dropzone-sub">블랙키위 트렌드 화면 스크린샷</p>
-                  </div>
+                <div class="card-title">STEP 1 — 키워드 입력</div>
+
+                <!-- 입력 방식 탭 -->
+                <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <button id="tistoryTabImage" onclick="switchTistoryTab('image')"
+                    style="flex:1;padding:8px;font-size:12px;font-family:var(--font-mono);border:none;cursor:pointer;background:var(--navy);color:#fff;font-weight:600">
+                    🖼️ 블랙키위 이미지
+                  </button>
+                  <button id="tistoryTabDirect" onclick="switchTistoryTab('direct')"
+                    style="flex:1;padding:8px;font-size:12px;font-family:var(--font-mono);border:none;cursor:pointer;background:var(--bg-input);color:var(--text-muted)">
+                    ⌨️ 키워드 직접 입력
+                  </button>
                 </div>
-                <input type="file" id="blackkiwiFileInput" accept="image/*" style="display:none" />
-                <div id="blackkiwiPreview" style="display:none;margin-top:12px;"></div>
-                <button class="btn btn-primary" id="blackkiwiFilterBtn"
-                  style="display:none;margin-top:12px" onclick="filterTistoryKeywords()">
-                  <span>🔍 키워드 읽기 + 필터링</span>
-                </button>
+
+                <!-- 이미지 업로드 모드 -->
+                <div id="tistoryModeImage">
+                  <div class="dropzone" id="blackkiwiDropzone">
+                    <div class="dropzone-inner">
+                      <span class="dropzone-icon">📋</span>
+                      <p class="dropzone-text">Ctrl+V 붙여넣기 / 클릭 업로드 / 드래그앤드롭</p>
+                      <p class="dropzone-sub">블랙키위 트렌드 화면 스크린샷</p>
+                    </div>
+                  </div>
+                  <input type="file" id="blackkiwiFileInput" accept="image/*" style="display:none" />
+                  <div id="blackkiwiPreview" style="display:none;margin-top:12px;"></div>
+                  <button class="btn btn-primary" id="blackkiwiFilterBtn"
+                    style="display:none;margin-top:12px" onclick="filterTistoryKeywords()">
+                    <span>🔍 키워드 읽기 + 필터링</span>
+                  </button>
+                </div>
+
+                <!-- 키워드 직접 입력 모드 -->
+                <div id="tistoryModeDirect" style="display:none">
+                  <div class="form-group">
+                    <label>키워드 입력 <span class="optional">(줄바꿈으로 구분, 최대 10개)</span></label>
+                    <textarea id="tistoryDirectKeywords" rows="6"
+                      placeholder="2026 자녀장려금&#10;차량5부제 대상지역&#10;벚꽃 명소&#10;법정공휴일"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label>카테고리</label>
+                    <select id="tistoryDirectCategory"
+                      style="width:100%;background:var(--bg-input);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;font-family:inherit">
+                      <option value="living">생활·절약</option>
+                      <option value="health">건강·증상</option>
+                      <option value="food">음식·영양</option>
+                      <option value="finance">재테크·금융</option>
+                      <option value="issue">시사·이슈</option>
+                      <option value="recommend">추천·비교</option>
+                      <option value="parenting">육아·교육</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-primary" onclick="loadDirectKeywords()">
+                    <span>🔍 검색량 조회</span>
+                  </button>
+                </div>
               </div>
 
               <!-- STEP 2 -->
               <div class="card" id="tistoryStep2" style="display:none">
                 <div class="card-title">STEP 2 — 최종 키워드 확인 후 생성</div>
                 <input type="hidden" id="tistoryStep2Category" value="living" />
-
                 <div class="form-group">
                   <label>네이버 확인 완료한 키워드</label>
                   <input type="text" id="tistoryFinalKeyword"
@@ -280,7 +274,6 @@
                     파워링크 ✓ &nbsp;|&nbsp; 월간 조회수 5만+ ✓ 확인된 키워드만
                   </div>
                 </div>
-
                 <!-- 웹검색 토글 -->
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 12px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border)">
                   <input type="checkbox" id="tistoryWebSearch" style="width:16px;height:16px;cursor:pointer;accent-color:var(--teal)" />
@@ -288,7 +281,6 @@
                     🔎 웹 검색 포함 <span style="color:var(--text-muted);font-family:var(--font-mono)">(시사·이슈 키워드에만 사용 — 토큰 2배 소모)</span>
                   </label>
                 </div>
-
                 <button class="btn btn-primary" onclick="generateTistoryFromKeyword()">
                   <span>✍️ 글 생성</span>
                 </button>
@@ -299,16 +291,11 @@
             <div class="col">
               <div class="loading-card" id="tistoryLoading" style="display:none">
                 <div class="spinner"></div>
-                <p id="tistoryLoadingText">이미지에서 키워드를 읽는 중...</p>
+                <p id="tistoryLoadingText">키워드를 읽는 중...</p>
               </div>
-
-              <div class="card result-card" id="tistoryKeywordResult" style="display:none">
-                <!-- JS 렌더링 -->
-              </div>
-
+              <div class="card result-card" id="tistoryKeywordResult" style="display:none"></div>
               <div class="card result-card" id="tistoryResult" style="display:none">
-                <div class="card-title">
-                  생성된 블로그 글
+                <div class="card-title">생성된 블로그 글
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyResult('tistoryOutput')">전체 복사</button>
                     <button class="btn-sm btn-accent" onclick="sendToThreads('tistoryOutput', 'tistory')">🧵 스레드로</button>
@@ -362,9 +349,7 @@
                     <label class="radio-label"><input type="radio" name="threadsTone" value="emotional" /> 공감·감성형</label>
                   </div>
                 </div>
-                <button class="btn btn-primary" onclick="generateThreads()">
-                  <span>스레드 생성</span>
-                </button>
+                <button class="btn btn-primary" onclick="generateThreads()"><span>스레드 생성</span></button>
               </div>
             </div>
             <div class="col">
@@ -373,8 +358,7 @@
                 <p id="threadsLoadingText">스레드를 생성 중입니다...</p>
               </div>
               <div class="card result-card" id="threadsResult" style="display:none">
-                <div class="card-title">
-                  생성된 스레드
+                <div class="card-title">생성된 스레드
                   <div class="card-actions">
                     <button class="btn-sm" onclick="copyAllThreads('threadsPostList')">전체 복사</button>
                   </div>
@@ -394,7 +378,6 @@
         </div>
         <div class="panel-body">
           <div class="settings-grid">
-
             <div class="card settings-card">
               <div class="card-title">🤖 Claude API</div>
               <div class="form-group">
@@ -405,7 +388,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">✨ Gemini API <span style="font-size:10px;color:var(--teal);font-family:var(--font-mono);font-weight:400">Claude 소진 시 자동 대체</span></div>
               <div class="form-group">
@@ -416,7 +398,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🖼️ Pexels API</div>
               <div class="form-group">
@@ -427,7 +408,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🛒 쿠팡 파트너스</div>
               <div class="form-group">
@@ -445,7 +425,6 @@
                 </div>
               </div>
             </div>
-
             <div class="card settings-card">
               <div class="card-title">🔊 Google Cloud TTS</div>
               <div class="form-group">
@@ -456,9 +435,7 @@
                 </div>
               </div>
             </div>
-
           </div>
-
           <div class="card" style="margin-top:16px">
             <div class="card-title">저장 상태</div>
             <div class="key-status-grid" id="keyStatusGrid"></div>
