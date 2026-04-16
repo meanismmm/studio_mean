@@ -14,7 +14,7 @@ async function generateThreads() {
   const count = document.querySelector('input[name="threadsCount"]:checked')?.value || '5';
   const tone  = document.querySelector('input[name="threadsTone"]:checked')?.value  || 'casual';
 
-  setLoading('threadsLoading', true, '스레드를 생성 중입니다...');
+  setLoading('_global', true, '스레드를 생성 중입니다...');
   document.getElementById('threadsResult').style.display = 'none';
 
   try {
@@ -47,7 +47,7 @@ ${input.slice(0, 3000)}`, 2000
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
-    setLoading('threadsLoading', false);
+    setLoading('_global', false);
   }
 }
 
