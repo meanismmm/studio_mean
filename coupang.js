@@ -71,7 +71,7 @@ async function analyzeCoupang() {
   const key = localStorage.getItem('CLAUDE_API_KEY');
   if (!key) { showToast('Claude API 키를 설정해주세요'); return; }
 
-  setLoading('coupangLoading', true, `이미지 ${coupangImgFiles.length}장 분석 중...`);
+  setLoading('_global', true, `이미지 ${coupangImgFiles.length}장 분석 중...`);
   document.getElementById('coupangExtractResult').style.display = 'none';
   document.getElementById('coupangOptionsCard').style.display   = 'none';
 
@@ -102,7 +102,7 @@ async function analyzeCoupang() {
   } catch(e) {
     showToast('분석 오류: ' + e.message);
   } finally {
-    setLoading('coupangLoading', false);
+    setLoading('_global', false);
   }
 }
 
@@ -142,7 +142,7 @@ async function generateCoupang() {
   const style = document.querySelector('input[name="coupangStyle"]:checked')?.value || 'pain';
   const ctx   = getTodayContext();
 
-  setLoading('coupangLoading', true, '홍보글을 생성 중...');
+  setLoading('_global', true, '홍보글을 생성 중...');
   document.getElementById('coupangBlogResult').style.display    = 'none';
   document.getElementById('coupangThreadsResult').style.display = 'none';
 
@@ -185,7 +185,7 @@ ${style==='pain'?'[PAIN형] 공감 문제 → 기존 해결책 한계 → 이 �
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
-    setLoading('coupangLoading', false);
+    setLoading('_global', false);
   }
 }
 
