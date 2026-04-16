@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <title>Studio Mean</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet"/>
@@ -21,41 +23,6 @@
   <button class="splash-cta" onclick="enterApp()">시작하기</button>
 </div>
 
-<!-- ===== Mobile Header ===== -->
-<header class="mobile-header">
-  <div class="mobile-logo">
-    <div class="mobile-logo-mark">S</div>
-    <span class="mobile-logo-text" id="mobileTitle">쿠팡 파트너스</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="mobile-api-dot" id="mobileApiDot"></div>
-    <button class="mobile-menu-btn" onclick="openMobileDrawer()">☰</button>
-  </div>
-</header>
-
-<!-- ===== Mobile Drawer ===== -->
-<div class="mobile-drawer" id="mobileDrawer">
-  <div class="mobile-drawer-backdrop" onclick="closeMobileDrawer()"></div>
-  <div class="mobile-drawer-panel">
-    <div class="mobile-drawer-header">
-      <div class="logo">
-        <div class="logo-mark">S</div>
-        <div class="logo-text">STUDIO<br><em>MEAN</em></div>
-      </div>
-      <button class="mobile-drawer-close" onclick="closeMobileDrawer()">×</button>
-    </div>
-    <nav class="mobile-drawer-nav">
-      <ul class="nav-list">
-        <li class="nav-item active" data-tab="coupang"><span class="nav-icon">🛒</span><span class="nav-label">쿠팡 파트너스</span></li>
-        <li class="nav-item" data-tab="psych"><span class="nav-icon">🏥</span><span class="nav-label">정신과 블로그</span></li>
-        <li class="nav-item" data-tab="tistory"><span class="nav-icon">✍️</span><span class="nav-label">티스토리</span></li>
-        <li class="nav-item" data-tab="threads"><span class="nav-icon">🧵</span><span class="nav-label">스레드</span></li>
-        <li class="nav-item" data-tab="settings"><span class="nav-icon">⚙️</span><span class="nav-label">설정</span></li>
-      </ul>
-    </nav>
-  </div>
-</div>
-
 <!-- ===== App ===== -->
 <div class="app">
 
@@ -67,7 +34,7 @@
         <div class="logo-text">STUDIO<br><em>MEAN</em></div>
       </div>
     </div>
-    <ul class="nav-list">
+    <ul class="nav-list" id="desktopNav">
       <li class="nav-item active" data-tab="coupang"><span class="nav-icon">🛒</span><span class="nav-label">쿠팡 파트너스</span></li>
       <li class="nav-item" data-tab="psych"><span class="nav-icon">🏥</span><span class="nav-label">정신과 블로그</span></li>
       <li class="nav-item" data-tab="tistory"><span class="nav-icon">✍️</span><span class="nav-label">티스토리</span></li>
@@ -93,26 +60,25 @@
       <div class="panel-body">
         <div class="two-col">
           <div class="col">
-
             <div class="card">
               <div class="card-title">
                 STEP 1 — 상품 스크린샷
                 <div style="display:flex;align-items:center;gap:8px">
-                  <span id="coupangImgCount" style="font-size:10px;color:var(--teal)"></span>
+                  <span id="coupangImgCount" style="font-size:11px;color:var(--teal);font-weight:600"></span>
                   <button class="btn-sm" onclick="resetCoupang()">초기화</button>
                 </div>
               </div>
               <div class="dropzone" id="coupangDropzone">
                 <div class="dropzone-inner">
                   <span class="dropzone-icon">📋</span>
-                  <p class="dropzone-text">Ctrl+V · 클릭 · 드래그앤드롭</p>
-                  <p class="dropzone-sub">쿠팡 상세페이지 스크린샷</p>
+                  <p class="dropzone-text">탭하여 이미지 선택</p>
+                  <p class="dropzone-sub">쿠팡 상품 페이지 스크린샷</p>
                 </div>
               </div>
               <input type="file" id="coupangFileInput" accept="image/*" multiple style="display:none"/>
               <div class="image-preview-row" id="coupangImgPreview" style="display:none"></div>
               <button class="btn btn-primary" id="coupangAnalyzeBtn" style="display:none" onclick="analyzeCoupang()">
-                <span>🔍 상품 정보 분석</span>
+                🔍 상품 정보 분석
               </button>
             </div>
 
@@ -123,31 +89,31 @@
               <div class="form-group">
                 <label>생성 유형</label>
                 <div class="radio-group">
-                  <label class="radio-label"><input type="radio" name="coupangType" value="blog" checked/>블로그 홍보글<span class="radio-desc">티스토리/네이버 발행용</span></label>
-                  <label class="radio-label"><input type="radio" name="coupangType" value="threads"/>스레드 포스트<span class="radio-desc">스레드 최적화 짧은 홍보글</span></label>
-                  <label class="radio-label"><input type="radio" name="coupangType" value="both"/>둘 다 생성</label>
+                  <label class="radio-label"><input type="radio" name="coupangType" value="blog" checked/><div><span>블로그 홍보글</span><span class="radio-desc">티스토리 발행용</span></div></label>
+                  <label class="radio-label"><input type="radio" name="coupangType" value="threads"/><div><span>스레드 포스트</span><span class="radio-desc">스레드 최적화</span></div></label>
+                  <label class="radio-label"><input type="radio" name="coupangType" value="both"/><div><span>둘 다 생성</span></div></label>
                 </div>
               </div>
               <div class="form-group">
                 <label>홍보 스타일</label>
                 <div class="radio-group">
-                  <label class="radio-label"><input type="radio" name="coupangStyle" value="pain" checked/>PAIN형<span class="radio-desc">문제 공감 → 해결책</span></label>
-                  <label class="radio-label"><input type="radio" name="coupangStyle" value="wow"/>WOW형<span class="radio-desc">놀라운 혜택 → 구매 충동</span></label>
+                  <label class="radio-label"><input type="radio" name="coupangStyle" value="pain" checked/><div><span>PAIN형</span><span class="radio-desc">문제 공감 → 해결책</span></div></label>
+                  <label class="radio-label"><input type="radio" name="coupangStyle" value="wow"/><div><span>WOW형</span><span class="radio-desc">놀라운 혜택 → 구매 충동</span></div></label>
                 </div>
               </div>
-              <button class="btn btn-primary" onclick="generateCoupang()"><span>✍️ 홍보글 생성</span></button>
+              <button class="btn btn-primary" onclick="generateCoupang()">✍️ 홍보글 생성</button>
             </div>
-
           </div>
+
           <div class="col">
             <div class="loading-card" id="coupangLoading" style="display:none">
-              <div class="spinner"></div><p>분석 중입니다...</p>
+              <div class="spinner"></div><p>이미지를 분석하고 있습니다...</p>
             </div>
             <div class="card result-card" id="coupangBlogResult" style="display:none">
               <div class="card-title">블로그 홍보글
                 <div class="card-actions">
                   <button class="btn-sm" onclick="copyResult('coupangBlogOutput')">복사</button>
-                  <button class="btn-sm btn-accent" onclick="sendToThreads('coupangBlogOutput')">🧵 스레드로</button>
+                  <button class="btn-sm btn-accent" onclick="sendToThreads('coupangBlogOutput')">🧵</button>
                 </div>
               </div>
               <div class="blog-title-box" id="coupangBlogTitle"></div>
@@ -172,7 +138,7 @@
     <section class="tab-panel" id="tab-psych">
       <div class="panel-header">
         <h1>정신과 블로그</h1>
-        <p>인천 가로수 정신건강의학과 — 네이버 블로그 포스팅 생성</p>
+        <p>인천 가로수 정신건강의학과 네이버 블로그 포스팅 생성</p>
       </div>
       <div class="panel-body">
         <div class="two-col">
@@ -181,24 +147,24 @@
               <div class="card-title">주제 추천</div>
               <div class="form-group">
                 <label>제외 주제 <span class="optional">(줄바꿈으로 구분)</span></label>
-                <textarea id="psychExclude" rows="4" placeholder="월경전불쾌장애&#10;기분부전장애"></textarea>
+                <textarea id="psychExclude" rows="3" placeholder="월경전불쾌장애&#10;기분부전장애"></textarea>
               </div>
-              <button class="btn btn-primary" onclick="recommendPsychTopics()"><span>주제 추천 (5개)</span></button>
+              <button class="btn btn-primary" onclick="recommendPsychTopics()">주제 추천 받기</button>
             </div>
             <div class="card" id="psychTopicCard" style="display:none">
-              <div class="card-title">추천 주제 — 선택하세요</div>
+              <div class="card-title">주제 선택</div>
               <div class="topic-list" id="psychTopicList"></div>
             </div>
           </div>
           <div class="col">
             <div class="loading-card" id="psychLoading" style="display:none">
-              <div class="spinner"></div><p id="psychLoadingText">작성 중...</p>
+              <div class="spinner"></div><p id="psychLoadingText">작성 중입니다...</p>
             </div>
             <div class="card result-card" id="psychResult" style="display:none">
               <div class="card-title">생성된 블로그 글
                 <div class="card-actions">
                   <button class="btn-sm" onclick="copyResult('psychOutput')">복사</button>
-                  <button class="btn-sm btn-accent" onclick="sendToThreads('psychOutput')">🧵 스레드로</button>
+                  <button class="btn-sm btn-accent" onclick="sendToThreads('psychOutput')">🧵</button>
                 </div>
               </div>
               <div class="blog-title-box" id="psychTitleBox"></div>
@@ -217,46 +183,46 @@
     <section class="tab-panel" id="tab-tistory">
       <div class="panel-header">
         <h1>티스토리</h1>
-        <p>키워드를 입력하면 SEO 최적화 블로그 글을 생성합니다</p>
+        <p>카테고리 선택 → 수익성 주제 추천 → SEO 글 생성</p>
       </div>
       <div class="panel-body">
         <div class="two-col">
           <div class="col">
             <div class="card">
-              <div class="card-title">키워드 입력</div>
+              <div class="card-title">주제 추천</div>
               <div class="form-group">
                 <label>카테고리</label>
                 <select id="tistoryCategory">
-                  <option value="health">건강·증상</option>
-                  <option value="food">음식·영양</option>
-                  <option value="living">생활·절약</option>
-                  <option value="recommend">추천·비교</option>
-                  <option value="issue">시사·이슈</option>
-                  <option value="finance">재테크·금융</option>
-                  <option value="parenting">육아·교육</option>
+                  <option value="health">🏥 건강·의료</option>
+                  <option value="money">💰 금융·재테크</option>
+                  <option value="law">⚖️ 법률·행정</option>
+                  <option value="it">💻 IT·디지털</option>
+                  <option value="living">🏠 생활·절약</option>
+                  <option value="food">🍱 음식·영양</option>
+                  <option value="travel">✈️ 여행·지역</option>
+                  <option value="parenting">👶 육아·교육</option>
+                  <option value="beauty">💄 뷰티·패션</option>
+                  <option value="recommend">⭐ 추천·비교</option>
+                  <option value="issue">📰 시사·이슈</option>
+                  <option value="pet">🐾 반려동물</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>키워드 <span class="required">*</span></label>
-                <input type="text" id="tistoryKeyword"
-                  placeholder="예: 템플스테이 예약 방법"
-                  onkeydown="if(event.key==='Enter') generateTistoryPost();"/>
-                <div style="font-size:11px;color:var(--t4);margin-top:6px;font-family:var(--fm);line-height:1.6">
-                  네이버 파워링크 ✓ &nbsp;|&nbsp; 월간 조회수 5만+ ✓ 확인된 키워드 권장
-                </div>
-              </div>
-              <button class="btn btn-primary" onclick="generateTistoryPost()"><span>✍️ 글 생성</span></button>
+              <button class="btn btn-primary" onclick="recommendTistoryTopics()">주제 추천 받기</button>
+            </div>
+            <div class="card" id="tistoryTopicCard" style="display:none">
+              <div class="card-title">주제 선택</div>
+              <div class="topic-list" id="tistoryTopicList"></div>
             </div>
           </div>
           <div class="col">
             <div class="loading-card" id="tistoryLoading" style="display:none">
-              <div class="spinner"></div><p id="tistoryLoadingText">글을 작성 중...</p>
+              <div class="spinner"></div><p id="tistoryLoadingText">작성 중입니다...</p>
             </div>
             <div class="card result-card" id="tistoryResult" style="display:none">
               <div class="card-title">생성된 블로그 글
                 <div class="card-actions">
                   <button class="btn-sm" onclick="copyResult('tistoryOutput')">복사</button>
-                  <button class="btn-sm btn-accent" onclick="sendToThreads('tistoryOutput')">🧵 스레드로</button>
+                  <button class="btn-sm btn-accent" onclick="sendToThreads('tistoryOutput')">🧵</button>
                 </div>
               </div>
               <div class="blog-title-box" id="tistoryTitleBox"></div>
@@ -275,20 +241,19 @@
     <section class="tab-panel" id="tab-threads">
       <div class="panel-header">
         <h1>스레드</h1>
-        <p>블로그 글을 스레드 최적화 포스트로 변환합니다</p>
+        <p>블로그 글을 스레드 포스트로 변환합니다</p>
       </div>
       <div class="panel-body">
         <div class="two-col">
           <div class="col">
             <div class="card">
-              <div class="card-title">원본 글</div>
               <div class="form-group">
-                <label>블로그 원본 URL <span class="optional">(선택)</span></label>
+                <label>블로그 URL <span class="optional">(선택)</span></label>
                 <input type="text" id="threadsSourceUrl" placeholder="https://blog.naver.com/..."/>
               </div>
               <div class="form-group">
                 <label>블로그 글 붙여넣기</label>
-                <textarea id="threadsInput" rows="10" placeholder="블로그 글을 붙여넣으세요.&#10;'🧵 스레드로' 버튼으로 자동 채워집니다."></textarea>
+                <textarea id="threadsInput" rows="8" placeholder="블로그 글을 붙여넣으세요.&#10;'🧵' 버튼으로 자동 채워집니다."></textarea>
               </div>
               <div class="form-group">
                 <label>포스트 수</label>
@@ -306,7 +271,7 @@
                   <label class="radio-label"><input type="radio" name="threadsTone" value="emotional"/>공감·감성형</label>
                 </div>
               </div>
-              <button class="btn btn-primary" onclick="generateThreads()"><span>스레드 생성</span></button>
+              <button class="btn btn-primary" onclick="generateThreads()">스레드 생성</button>
             </div>
           </div>
           <div class="col">
@@ -328,7 +293,7 @@
     <section class="tab-panel" id="tab-settings">
       <div class="panel-header">
         <h1>설정</h1>
-        <p>API 키는 브라우저 로컬에만 저장됩니다</p>
+        <p>API 키는 기기 브라우저에만 저장됩니다</p>
       </div>
       <div class="panel-body">
         <div class="settings-grid">
@@ -343,7 +308,7 @@
             </div>
           </div>
           <div class="card settings-card">
-            <div class="card-title">🖼️ Pexels API</div>
+            <div class="card-title">🖼️ Pexels</div>
             <div class="form-group">
               <label>Pexels API Key</label>
               <div class="input-row">
@@ -361,7 +326,7 @@
                 <button class="btn-sm" onclick="saveKey('coupangAccessKey','COUPANG_ACCESS_KEY')">저장</button>
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:12px">
               <label>Secret Key</label>
               <div class="input-row">
                 <input type="password" id="coupangSecretKey" placeholder="Secret Key"/>
@@ -370,7 +335,7 @@
             </div>
           </div>
           <div class="card settings-card">
-            <div class="card-title">🔊 Google Cloud TTS</div>
+            <div class="card-title">🔊 GCP TTS</div>
             <div class="form-group">
               <label>GCP API Key</label>
               <div class="input-row">
@@ -380,7 +345,7 @@
             </div>
           </div>
         </div>
-        <div class="card" style="margin-top:16px">
+        <div class="card" style="margin-top:14px">
           <div class="card-title">저장 상태</div>
           <div class="key-status-grid" id="keyStatusGrid"></div>
           <button class="btn-danger" onclick="clearAllKeys()" style="margin-top:14px">모든 키 초기화</button>
@@ -391,9 +356,34 @@
   </main>
 </div>
 
-<!-- ===== Scripts ===== -->
+<!-- ===== Bottom Navigation (Mobile) ===== -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bottom-nav-item active" data-tab="coupang">
+      <span class="bottom-nav-icon">🛒</span>
+      <span class="bottom-nav-label">쿠팡</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="psych">
+      <span class="bottom-nav-icon">🏥</span>
+      <span class="bottom-nav-label">정신과</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tistory">
+      <span class="bottom-nav-icon">✍️</span>
+      <span class="bottom-nav-label">티스토리</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="threads">
+      <span class="bottom-nav-icon">🧵</span>
+      <span class="bottom-nav-label">스레드</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="settings">
+      <span class="bottom-nav-icon">⚙️</span>
+      <span class="bottom-nav-label">설정</span>
+    </button>
+  </div>
+</nav>
+
 <script>
-// 명언 + 스플래시
+// ===== Splash =====
 const QUOTES = [
   {t:"부자가 되고 싶다면, 부자처럼 생각하는 것을 멈추고 부자처럼 행동하기 시작하라.",a:"나폴레온 힐"},
   {t:"기회는 노력하는 사람에게만 문을 연다.",a:"루이 파스퇴르"},
@@ -405,29 +395,26 @@ const QUOTES = [
   {t:"1%의 영감과 99%의 노력이 천재를 만든다.",a:"토마스 에디슨"},
   {t:"어제의 나보다 오늘의 내가 조금이라도 나아졌다면, 그것이 성공이다.",a:"작자 미상"},
   {t:"꿈을 현실로 만드는 유일한 방법은 깨어나 일하는 것이다.",a:"작자 미상"},
-  {t:"평범한 사람은 시간을 보내고, 재능 있는 사람은 시간을 쓰며, 천재는 시간을 훔친다.",a:"쇼펜하우어"},
   {t:"남들이 놀 때 공부하고, 남들이 잘 때 일하는 사람이 성공한다.",a:"작자 미상"},
   {t:"부는 목적지가 아니라 여정의 부산물이다. 가치를 만들면 돈은 따라온다.",a:"워런 버핏"},
+  {t:"돈은 도구다. 그것이 당신을 부릴지, 당신이 그것을 부릴지는 당신의 선택이다.",a:"작자 미상"},
   {t:"작은 기회로부터 종종 위대한 업적이 시작된다.",a:"데모스테네스"},
-  {t:"돈은 도구다. 그것이 당신을 부릴지, 당신이 그것을 부릴지는 당신의 선택이다.",a:"작자 미상"}
+  {t:"평범한 사람은 시간을 보내고, 재능 있는 사람은 시간을 쓴다.",a:"쇼펜하우어"}
 ];
-const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+const q = QUOTES[Math.floor(Math.random()*QUOTES.length)];
 document.getElementById('splashQuote').textContent  = q.t;
 document.getElementById('splashAuthor').textContent = '— ' + q.a;
-
-function enterApp() {
-  document.getElementById('splash').classList.add('hidden');
-}
+function enterApp() { document.getElementById('splash').classList.add('hidden'); }
 document.addEventListener('keydown', e => {
   if ((e.key==='Enter'||e.key===' ') && !document.getElementById('splash').classList.contains('hidden')) enterApp();
 });
 </script>
 
 <script src="api.js"></script>
-<script src="app.js"></script>
 <script src="blog.js"></script>
+<script src="threads.js"></script>
 <script src="coupang.js"></script>
 <script src="settings.js"></script>
-<script src="threads.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
