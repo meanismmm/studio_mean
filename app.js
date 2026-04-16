@@ -1,51 +1,75 @@
-// ===== app.js =====
+// ===== app.js — 반드시 맨 먼저 로드 =====
 
-function switchTab(tab) {
-  // 패널 전환
-  document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.id === 'tab-' + tab);
-  });
+// ===== 공통 유틸 (다른 JS들이 사용) =====
 
-  // 데스크톱 사이드바
-  document.querySelectorAll('#desktopNav .nav-item').forEach(i => {
-    i.classList.toggle('active', i.dataset.tab === tab);
-  });
-
-  // 모바일 하단 탭
-  document.querySelectorAll('.bottom-nav-item').forEach(i => {
-    i.classList.toggle('active', i.dataset.tab === tab);
-  });
-
-  // 모바일: 페이지 상단으로 스크롤
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+function showToast(msg, duration = 2200) {
+  let t = document.getElementById('_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_toast';
+    t.style.cssText = [
+      'position:fixed','bottom:88px','left:50%','transform:translateX(-50%) scale(0.92)',
+      'background:var(--ink)','color:rgba(255,255,255,0.92)',
+      'padding:12px 24px','border-radius:50px',
+      'font-size:14px','font-weight:600','z-index:9999','opacity:0',
+      'transition:opacity 0.2s, transform 0.2s',
+      'pointer-events:none','font-family:var(--fm)',
+      'white-space:nowrap','box-shadow:0 6px 20px rgba(0,0,0,0.3)',
+      'border:1px solid rgba(255,255,255,0.08)'
+    ].join(';');
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) scale(1)';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) scale(0.92)';
+  }, duration);
 }
 
-// 데스크톱 사이드바 클릭
-document.querySelectorAll('#desktopNav .nav-item').forEach(item => {
-  item.addEventListener('click', () => switchTab(item.dataset.tab));
-});
+// 글로벌 로딩 오버레이
+function setLoading(id, visible, text = '처리 중...') {
+  // 기존 카드 방식 지원 (하위호환)
+  const cardEl = document.getElementById(id);
+  if (cardEl && cardEl.classList.contains('loading-card')) {
+    cardEl.style.display = visible ? 'flex' : 'none';
+    const p = cardEl.querySelector('p');
+    if (p && text) p.textContent = text;
+    return;
+  }
 
-// 모바일 하단 탭 클릭
-document.querySelectorAll('.bottom-nav-item').forEach(item => {
-  item.addEventListener('click', () => switchTab(item.dataset.tab));
-});
+  // 글로벌 오버레이
+  let overlay = document.getElementById('_loadingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = '_loadingOverlay';
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `
+      <div class="loading-box">
+        <div class="spinner"></div>
+        <p id="_loadingText">처리 중...</p>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
 
-// API 상태 표시
-function updateApiStatus() {
-  const ok = !!localStorage.getItem('CLAUDE_API_KEY');
-  const dot  = document.getElementById('statusDot');
-  const text = document.getElementById('statusText');
-  if (dot)  { dot.className = 'status-dot' + (ok ? ' ok' : ''); }
-  if (text) { text.textContent = ok ? 'API 연결됨' : 'API 미설정'; }
+  const textEl = document.getElementById('_loadingText');
+  if (textEl) textEl.textContent = text;
+
+  if (visible) {
+    overlay.classList.add('visible');
+  } else {
+    overlay.classList.remove('visible');
+  }
 }
-updateApiStatus();
 
-// ===== 공통 유틸 =====
 function copyResult(id) {
   const el = document.getElementById(id);
   if (!el) return;
   navigator.clipboard.writeText((el.innerText || el.textContent).trim())
-    .then(() => showToast('복사됨!'));
+    .then(() => showToast('✓ 복사됨'))
+    .catch(() => showToast('복사 실패'));
 }
 
 function copyAllThreads(listId) {
@@ -53,36 +77,7 @@ function copyAllThreads(listId) {
   if (!list) return;
   const posts = list.querySelectorAll('.thread-post-text');
   const text  = Array.from(posts).map((p, i) => `[${i+1}]\n${p.textContent.trim()}`).join('\n\n---\n\n');
-  navigator.clipboard.writeText(text).then(() => showToast('전체 복사됨!'));
-}
-
-function showToast(msg) {
-  let t = document.getElementById('toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.id = 'toast';
-    t.style.cssText = [
-      'position:fixed','bottom:80px','left:50%','transform:translateX(-50%)',
-      'background:var(--ink)','color:#fff','padding:11px 22px','border-radius:50px',
-      'font-size:14px','font-weight:600','z-index:9999','opacity:0',
-      'transition:opacity 0.2s','pointer-events:none',
-      'font-family:var(--fm)','letter-spacing:0.02em',
-      'white-space:nowrap','box-shadow:0 4px 16px rgba(0,0,0,0.25)'
-    ].join(';');
-    document.body.appendChild(t);
-  }
-  t.textContent = msg;
-  t.style.opacity = '1';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2000);
-}
-
-function setLoading(id, visible, text = '처리 중...') {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.display = visible ? 'flex' : 'none';
-  const p = el.querySelector('p');
-  if (p && text) p.textContent = text;
+  navigator.clipboard.writeText(text).then(() => showToast('✓ 전체 복사됨'));
 }
 
 function sendToThreads(outputId) {
@@ -93,5 +88,56 @@ function sendToThreads(outputId) {
   const input = document.getElementById('threadsInput');
   if (input) input.value = text;
   switchTab('threads');
-  showToast('스레드 탭으로 이동했습니다');
+  showToast('스레드 탭으로 이동');
 }
+
+// ===== 탭 전환 =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + tab);
+  });
+  document.querySelectorAll('.nav-item[data-tab]').forEach(i => {
+    i.classList.toggle('active', i.dataset.tab === tab);
+  });
+  document.querySelectorAll('.bottom-nav-item[data-tab]').forEach(i => {
+    i.classList.toggle('active', i.dataset.tab === tab);
+  });
+  // 현재 탭 이름 업데이트
+  const label = document.querySelector(`.nav-item[data-tab="${tab}"] .nav-label, .bottom-nav-item[data-tab="${tab}"] .bottom-nav-label`);
+  const titleEl = document.getElementById('_topbarTitle');
+  if (titleEl && label) titleEl.textContent = label.textContent;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== API 상태 =====
+function updateApiStatus() {
+  const ok = !!localStorage.getItem('CLAUDE_API_KEY');
+  ['statusDot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'status-dot' + (ok ? ' ok' : '');
+  });
+  ['_mobileApiDot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'mobile-api-dot' + (ok ? ' ok' : '');
+  });
+  const txt = document.getElementById('statusText');
+  if (txt) txt.textContent = ok ? 'API 연결됨' : 'API 미설정';
+  const mtxt = document.getElementById('_mobileApiText');
+  if (mtxt) mtxt.textContent = ok ? '연결됨' : '미설정';
+}
+
+// ===== 이벤트 바인딩 (DOM 로드 후) =====
+document.addEventListener('DOMContentLoaded', () => {
+  // 데스크톱 사이드바
+  document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
+    item.addEventListener('click', () => switchTab(item.dataset.tab));
+  });
+
+  // 모바일 하단 탭
+  document.querySelectorAll('.bottom-nav-item[data-tab]').forEach(item => {
+    item.addEventListener('click', () => switchTab(item.dataset.tab));
+  });
+
+  updateApiStatus();
+});
