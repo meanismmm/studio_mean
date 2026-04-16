@@ -1,15 +1,26 @@
 // ===== blog.js =====
 
-const TISTORY_POST_STYLE = {
-  health:'health', food:'health', living:'info',
-  recommend:'recommend', issue:'essay', finance:'info', parenting:'info'
+// ===== 티스토리 카테고리 설정 =====
+const TISTORY_CAT = {
+  health:    { name:'건강·의료',      pStyle:'health',    pexels:'healthcare medical wellness' },
+  money:     { name:'금융·재테크',    pStyle:'info',      pexels:'finance money investment' },
+  law:       { name:'법률·행정',      pStyle:'info',      pexels:'law legal documents' },
+  it:        { name:'IT·디지털',      pStyle:'info',      pexels:'technology digital gadget' },
+  living:    { name:'생활·절약',      pStyle:'info',      pexels:'living lifestyle home' },
+  food:      { name:'음식·영양',      pStyle:'health',    pexels:'food nutrition healthy' },
+  travel:    { name:'여행·지역',      pStyle:'info',      pexels:'travel destination tourism' },
+  parenting: { name:'육아·교육',      pStyle:'info',      pexels:'parenting child education' },
+  beauty:    { name:'뷰티·패션',      pStyle:'recommend', pexels:'beauty skincare fashion' },
+  recommend: { name:'추천·비교',      pStyle:'recommend', pexels:'product review comparison' },
+  issue:     { name:'시사·이슈',      pStyle:'essay',     pexels:'news society people' },
+  pet:       { name:'반려동물',       pStyle:'info',      pexels:'pet dog cat animal' },
 };
 
 const TISTORY_SYSTEM = {
   health: `당신은 건강·음식 정보 티스토리 블로그 작가입니다.
 
 [절대 금지]
-- "2주에 한 번", "충분한 수분 섭취" 같은 뻔한 조언
+- "충분한 수분 섭취", "규칙적인 운동" 같은 뻔한 조언
 - 수치만 나열하고 이유 안 쓰는 것 (왜 그 수치인지 메커니즘까지 필수)
 - 다른 블로그 10개에서 똑같이 나오는 일반론
 
@@ -28,11 +39,11 @@ const TISTORY_SYSTEM = {
 
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
-  info: `당신은 생활정보 티스토리 블로그 작가입니다.
+  info: `당신은 생활·정보 티스토리 블로그 작가입니다.
 
 [절대 금지]
 - 인터넷에서 복붙되는 팁 목록 나열
-- 이유 없는 방법 나열
+- 이유 없는 방법 나열 (원리 필수)
 
 [반드시 포함]
 - 역발상 또는 "대부분이 잘못 알고 있는 것" 시각 최소 1개
@@ -62,20 +73,137 @@ const TISTORY_SYSTEM = {
 [톤앤매너] 1인칭. 직접 써봤거나 꼼꼼히 비교해본 사람의 시점. 단언체.
 
 [구조]
-[목차] 1.고르기 전 핵심 기준 / 2~5.추천항목 / 6.유형별 요약
+[목차]
+1. 고르기 전에 알아야 할 핵심 기준
+2~5. (추천항목별)
+6. 유형별 최종 추천 요약
+
 각 항목 320~380자. 특징·장단점·가격대·추천 대상 명시.
 총 2500~3200자. ## 소제목 외 마크다운 기호 일절 금지.`,
 
   essay: `당신은 티스토리 개인 블로그 작가입니다.
 
 샘플: "분명하게 말하지만, 이 글은 나태하게 살라는 말을 하려는 것은 아니다."
-
 1인칭. 직설적. 시니컬하되 히스테릭하지 않음. 마무리는 짧게 끊음. 현재 날짜/계절 반영.
 
 [구조] [목차] 1~3개 소제목
 서론 150자 내외 → ## 소제목별 280~350자 → 마무리 100자 이내
 총 1500~2000자. ## 소제목 외 마크다운 기호 일절 금지.`
 };
+
+// ==================== 티스토리 ====================
+
+async function recommendTistoryTopics() {
+  const cat = document.getElementById('tistoryCategory').value || 'health';
+  const catInfo = TISTORY_CAT[cat];
+  const saved   = JSON.parse(localStorage.getItem(`tistory_used_${cat}`) || '[]');
+  const seed    = Math.floor(Math.random() * 10000);
+  const ctx     = getTodayContext();
+
+  setLoading('_global', true, '주제를 추천하고 있습니다...');
+  document.getElementById('tistoryTopicCard').style.display = 'none';
+  document.getElementById('tistoryResult').style.display    = 'none';
+
+  try {
+    const result = await callClaude(
+      '당신은 티스토리 애드센스 블로그 주제 기획 전문가입니다.',
+      `오늘: ${ctx.dateStr} / 계절: ${ctx.season} / 시의성: ${ctx.monthlyKeywords} / 번호: ${seed}
+
+카테고리: ${catInfo.name}
+제외 주제 (절대 포함 금지): ${saved.length ? saved.join(', ') : '없음'}
+
+[주제 추천 기준]
+- 네이버 파워링크(광고)가 붙는 상업적 키워드
+- 월간 조회수가 충분히 있을 것으로 예상되는 키워드
+- 현재 계절(${ctx.season})과 시의성에 맞는 키워드
+- 애드센스 단가가 높은 ${catInfo.name} 관련 주제
+- 제목 형태: "~하는 방법", "~추천", "~주의사항", "~총정리", "~원인과 해결법" 중 택일
+
+반드시 번호 목록으로만:
+1. 제목1
+2. 제목2
+3. 제목3
+4. 제목4
+5. 제목5`, 600
+    );
+
+    const topics = result.trim().split('\n')
+      .filter(l => l.match(/^\d+\./))
+      .map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+    localStorage.setItem(`tistory_used_${cat}`,
+      JSON.stringify([...new Set([...saved, ...topics])].slice(-100)));
+
+    renderTistoryTopics(topics, cat);
+  } catch(e) {
+    showToast('오류: ' + e.message);
+  } finally {
+    setLoading('_global', false);
+  }
+}
+
+function renderTistoryTopics(topics, cat) {
+  const list = document.getElementById('tistoryTopicList');
+  list.innerHTML = '';
+
+  topics.forEach((title, i) => {
+    const item = document.createElement('div');
+    item.className = 'topic-item';
+    item.innerHTML = `<div class="topic-num">${String(i+1).padStart(2,'0')}</div><div><div class="topic-title">${title}</div></div>`;
+    item.addEventListener('click', () => generateTistoryPost(title, cat));
+    list.appendChild(item);
+  });
+
+  // 직접 입력
+  const d = document.createElement('div');
+  d.className = 'topic-item';
+  d.style.borderStyle = 'dashed';
+  d.innerHTML = `
+    <div class="topic-num">✏️</div>
+    <div style="display:flex;gap:8px;align-items:center;width:100%">
+      <input type="text" id="tistoryDirectInput" placeholder="주제 직접 입력..."
+        style="flex:1;background:var(--bg-input);border:1.5px solid var(--border);border-radius:var(--rs);padding:10px 12px;color:var(--t1);font-size:16px;font-family:inherit;outline:none"
+        onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v)generateTistoryPost(v,'${cat}');}"/>
+      <button class="btn-sm btn-accent" onclick="const v=document.getElementById('tistoryDirectInput').value.trim();if(v)generateTistoryPost(v,'${cat}');">생성</button>
+    </div>`;
+  list.appendChild(d);
+  document.getElementById('tistoryTopicCard').style.display = 'block';
+}
+
+async function generateTistoryPost(title, cat) {
+  const catInfo  = TISTORY_CAT[cat] || TISTORY_CAT.living;
+  const postStyle = catInfo.pStyle;
+  const ctx = getTodayContext();
+
+  setLoading('_global', true, '블로그 글을 작성 중...');
+  document.getElementById('tistoryResult').style.display = 'none';
+
+  try {
+    const result = await callClaude(
+      TISTORY_SYSTEM[postStyle],
+      `오늘: ${ctx.dateStr} / 계절: ${ctx.season} / 시의성: ${ctx.monthlyKeywords}
+
+키워드: "${title}"
+
+[SEO 지시]
+- 제목에 키워드 "${title}" 반드시 포함
+- 첫 문단에 키워드 자연스럽게 포함
+- 소제목에 키워드 변형 표현 포함
+- 목차를 반드시 글 상단에 포함
+- 인터넷에 이미 있는 뻔한 표현과 구조 반복 금지
+- 총 분량 준수`, 3500
+    );
+
+    document.getElementById('tistoryTitleBox').textContent = title;
+    document.getElementById('tistoryOutput').textContent   = result;
+    await renderPexelsImages(catInfo.pexels, 'tistoryImageList', 'tistoryImages');
+    document.getElementById('tistoryResult').style.display = 'block';
+  } catch(e) {
+    showToast('오류: ' + e.message);
+  } finally {
+    setLoading('_global', false);
+  }
+}
 
 // ==================== 정신과 블로그 ====================
 
@@ -86,7 +214,7 @@ async function recommendPsychTopics() {
   const exclude = [...new Set([...manual, ...saved])];
   const seed = Math.floor(Math.random() * 10000);
 
-  setLoading('psychLoading', true, '주제를 추천하고 있습니다...');
+  setLoading('_global', true, '주제를 추천하고 있습니다...');
   document.getElementById('psychTopicCard').style.display = 'none';
   document.getElementById('psychResult').style.display    = 'none';
 
@@ -115,7 +243,7 @@ async function recommendPsychTopics() {
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
-    setLoading('psychLoading', false);
+    setLoading('_global', false);
   }
 }
 
@@ -131,7 +259,6 @@ function renderPsychTopics(topics) {
     list.appendChild(item);
   });
 
-  // 직접 입력
   const d = document.createElement('div');
   d.className = 'topic-item';
   d.style.borderStyle = 'dashed';
@@ -148,7 +275,7 @@ function renderPsychTopics(topics) {
 }
 
 async function generatePsychPost(title) {
-  setLoading('psychLoading', true, '블로그 글을 작성 중입니다...');
+  setLoading('_global', true, '블로그 글을 작성 중입니다...');
   document.getElementById('psychResult').style.display = 'none';
 
   try {
@@ -188,50 +315,6 @@ async function generatePsychPost(title) {
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
-    setLoading('psychLoading', false);
-  }
-}
-
-// ==================== 티스토리 ====================
-
-async function generateTistoryPost() {
-  const keyword  = document.getElementById('tistoryKeyword').value.trim();
-  if (!keyword) { showToast('키워드를 입력해주세요'); return; }
-
-  const category = document.getElementById('tistoryCategory').value || 'living';
-  const postStyle = TISTORY_POST_STYLE[category] || 'info';
-  const ctx = getTodayContext();
-
-  const pexelsMap = {
-    health:'healthy food nutrition wellness', info:'living lifestyle home tips',
-    recommend:'product review comparison', essay:'daily life society people'
-  };
-
-  setLoading('tistoryLoading', true, '블로그 글을 작성 중...');
-  document.getElementById('tistoryResult').style.display = 'none';
-
-  try {
-    const result = await callClaude(
-      TISTORY_SYSTEM[postStyle],
-      `오늘: ${ctx.dateStr} / 계절: ${ctx.season} / 이달 시의성: ${ctx.monthlyKeywords}
-
-키워드: "${keyword}"
-
-[SEO 지시]
-- 제목에 키워드 "${keyword}" 반드시 포함
-- 첫 문단에 키워드 자연스럽게 포함
-- 소제목에 키워드 변형 표현 포함
-- 목차를 반드시 글 상단에 포함
-- 총 분량 준수`, 3500
-    );
-
-    document.getElementById('tistoryTitleBox').textContent = keyword;
-    document.getElementById('tistoryOutput').textContent   = result;
-    await renderPexelsImages(pexelsMap[postStyle] || 'lifestyle', 'tistoryImageList', 'tistoryImages');
-    document.getElementById('tistoryResult').style.display = 'block';
-  } catch(e) {
-    showToast('오류: ' + e.message);
-  } finally {
-    setLoading('tistoryLoading', false);
+    setLoading('_global', false);
   }
 }
