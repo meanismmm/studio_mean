@@ -1,11 +1,8 @@
 // ===== settings.js =====
 
 const KEY_LABELS = {
-  CLAUDE_API_KEY:     '🤖 Claude',
-  PEXELS_API_KEY:     '🖼️ Pexels',
-  COUPANG_ACCESS_KEY: '🛒 쿠팡 Access',
-  COUPANG_SECRET_KEY: '🛒 쿠팡 Secret',
-  GCP_TTS_KEY:        '🔊 GCP TTS'
+  CLAUDE_API_KEY: '🤖 Claude',
+  PEXELS_API_KEY: '🖼️ Pexels',
 };
 
 function saveKey(inputId, storageKey) {
@@ -43,9 +40,7 @@ function renderKeyStatus() {
 
 document.querySelector('[data-tab="settings"]')?.addEventListener('click', () => {
   renderKeyStatus();
-  [['claudeKey','CLAUDE_API_KEY'],['pexelsKey','PEXELS_API_KEY'],
-   ['coupangAccessKey','COUPANG_ACCESS_KEY'],['coupangSecretKey','COUPANG_SECRET_KEY'],
-   ['ttsKey','GCP_TTS_KEY']].forEach(([id, key]) => {
+  [['claudeKey','CLAUDE_API_KEY'],['pexelsKey','PEXELS_API_KEY']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el && localStorage.getItem(key)) el.placeholder = '저장됨 (변경하려면 새 값 입력)';
   });
