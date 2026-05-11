@@ -16,7 +16,6 @@ const TISTORY_CAT = {
   pet:       { name:'반려동물',    pStyle:'info',      pexels:'pet dog cat animal' },
 };
 
-// 카테고리별 주제 각도 가이드 (다양성 확보)
 const TISTORY_ANGLE_GUIDE = {
   health:    '증상·원인·치료·예방·오해와진실·비교·체크리스트 등 다양한 각도',
   money:     '절세·재테크·보험·대출·투자·절약·정부지원금 등 다양한 각도',
@@ -227,6 +226,117 @@ async function generateTistoryPost(title, cat) {
 
 // ==================== 정신과 블로그 ====================
 
+// ===== 작성 원칙 (확장 가능한 별도 상수) =====
+const PSYCH_PRINCIPLES = {
+
+  // 문단 구조 원칙
+  structure: `
+[문단 구조 — 반드시 이 순서와 형식 그대로]
+제목 (SEO 최적화, "인천 가로수 정신건강의학과" 포함)
+---
+한 줄 감성 요약 (독자의 마음을 건드리는 한 문장. 제목과 내용이 겹치지 않게.)
+---
+서두: 주제를 감성적으로 소개하는 1~2문장
+(지도)
+1문단: 환자 공감 도입. 250~350자
+--사진1--
+2문단: 질환/증상 설명. 비유 활용. 250~350자
+--사진2--
+3문단: 원인 또는 오해와 진실. 250~350자
+--사진3--
+4문단: 방치 시 위험성 또는 치료 필요성. 250~350자
+--사진4--
+5문단: 치료 방법과 회복 가능성. 희망적으로. 250~350자
+--사진5--
+6문단: 가족/주변인의 역할 또는 일상 회복 팁. 250~350자
+---
+맺음말: 따뜻한 마무리 2~3문장. 병원 방문 권유.
+인천 가로수 정신건강의학과 이성철 원장
+
+총 2000~2200자. 마크다운 기호 절대 금지.`,
+
+  // 오리지널리티 원칙
+  originality: `
+[오리지널리티 — 절대 금지 표현 목록]
+다음 표현들은 인터넷에서 광범위하게 사용되는 클리셰로 절대 사용 금지:
+- "감정의 롤러코스터" → "감정이 순식간에 뒤집히는 경험"으로 대체
+- "마음의 감기" → 삭제 또는 완전히 다른 표현으로
+- "화재경보기가 오작동" → "뇌의 위험 감지 시스템이 과민하게 반응"으로 대체
+- "압력솥에 증기가 쌓이듯" → 다른 비유로
+- "강물이 댐에 막히듯" → 다른 비유로
+- "징검다리 역할" → 다른 표현으로
+- "악순환의 고리" → "~가 ~를 부르는 구조"로 대체
+- "장기전에 대비" → 다른 표현으로
+- "혼자 끙끙 앓지 마시고" → "혼자 감당하려 하지 마시고"로 대체
+- "평온한 마음의 항구" → 다른 표현으로
+- "피부가 얇아서" → 다른 비유로
+- "마라톤을 뛰듯" → 다른 표현으로
+- 같은 글 안에서 유사한 구조의 비유 3개 이상 반복 금지
+매 글마다 완전히 새로운 도입부와 비유 사용. 이전 글과 같은 도입부 절대 금지.`,
+
+  // 의학적 정확성 원칙
+  medical: `
+[의학적 정확성 — 반드시 준수]
+- 단일 원인 단정 금지: "~때문에 생긴다" → "~등이 복합적으로 작용한다"
+- 치료 효과 과장 금지: "반드시 낫는다" → "충분히 회복 가능하다", "분명히 나아지는 길을 찾을 수 있다"
+- 인과관계 단순화 금지: 뇌 화학물질 불균형을 단독 원인으로 서술 금지
+- 자살·자해 표현: "자살로 이어진다" → "정신건강 위기 상황에 더 취약해질 수 있다"
+- 치료 효과 개인차 명시: 회복 속도는 사람마다 다름을 언급
+- 청소년 약물치료: 반드시 "전문의 판단에 따라 신중하게"라는 맥락 포함
+- 알코올 의존증 단주: "정상적인 음주 회복"이 아닌 "건강한 일상 회복"으로 서술
+- 벤조디아제핀 감량: 구체적 수치(25~50%) 제시 금지, "전문의와 함께 서서히"로 서술
+- 노인 우울증: 성별 단정 금지, "특히 여성에게 더 많이 나타나는 경향"으로 서술
+- 적응장애 진단 기준: "3개월 이상 지속" 오용 금지 (DSM-5 기준 정확히 적용)`,
+
+  // 톤앤매너 원칙
+  tone: `
+[톤앤매너]
+따뜻하고 공감적인 의사 어투. ~합니다/~지요/~이지요 체.
+환자 감정 공감 먼저, 의학 정보 자연스럽게 연결.
+소제목 없음. 구분점 없음. 번호 없음. 마크다운 없음. 별표 없음.
+수필처럼 문단이 자연스럽게 이어지는 완성된 글.
+비유와 은유는 신선하고 오리지널하게. 전문용어는 쉽게 풀어서.
+공포 조장 금지. 과도한 위험 강조 금지.
+샘플 어투: "매달 약국에서 가장 꾸준히 팔리는 약을 하나만 꼽으라고 한다면 단연 생리통 진통제가 아닐까 합니다. 많은 여성이 다가올 육체적 통증에 대비해 약을 상비하지만, 생리 시작 전 찾아오는 '감정의 통증' 앞에서는 아무런 대응도 하지 못한 채 속수무책의 상황에 빠지곤 하지요."`
+};
+
+// 검토 원칙 (자동 검토 시 사용)
+const PSYCH_REVIEW_SYSTEM = `당신은 인천 가로수 정신건강의학과 블로그 글 전문 편집자입니다.
+아래 원칙에 따라 글을 검토하고 완성본을 출력합니다.
+
+${PSYCH_PRINCIPLES.originality}
+
+${PSYCH_PRINCIPLES.medical}
+
+[문단 구조 검토]
+반드시 아래 구조인지 확인하고 맞지 않으면 수정:
+제목
+---
+한 줄 감성 요약
+---
+서두 (1~2문장)
+(지도)
+1문단 (250~350자)
+--사진1--
+2문단 (250~350자)
+--사진2--
+3문단 (250~350자)
+--사진3--
+4문단 (250~350자)
+--사진4--
+5문단 (250~350자)
+--사진5--
+6문단 (250~350자)
+---
+맺음말
+인천 가로수 정신건강의학과 이성철 원장
+
+[출력 규칙]
+- 검토 코멘트 없이 완성본 텍스트만 출력
+- 마크다운 기호 절대 금지
+- 수정한 부분을 표시하거나 설명하지 말 것
+- 오직 발행 가능한 최종 완성본 텍스트만 출력`;
+
 // 정신과 주제 각도 가이드
 const PSYCH_ANGLE_GUIDE = [
   '증상 인식·자가진단', '오해와 진실', '치료 방법·과정',
@@ -242,7 +352,6 @@ async function recommendPsychTopics() {
   const saved     = JSON.parse(localStorage.getItem('psych_used_topics') || '[]');
   const exclude   = [...new Set([...manual, ...saved])];
   const seed      = Math.floor(Math.random() * 10000);
-  // 매번 다른 각도 힌트 3개를 랜덤 선택
   const angleHints = [...PSYCH_ANGLE_GUIDE]
     .sort(() => Math.random() - 0.5)
     .slice(0, 3)
@@ -317,50 +426,71 @@ function renderPsychTopics(topics) {
   document.getElementById('psychTopicCard').style.display = 'block';
 }
 
+// 사용된 도입부/비유 누적 저장
+function savePsychUsedPhrases(text) {
+  const saved = JSON.parse(localStorage.getItem('psych_used_phrases') || '[]');
+  // 첫 문단(지도 이후 첫 100자)을 도입부 지문으로 저장
+  const lines = text.split('\n').filter(l => l.trim().length > 20);
+  const intro = lines.slice(0, 3).map(l => l.trim().slice(0, 50)).join(' / ');
+  if (intro) {
+    const updated = [...new Set([...saved, intro])].slice(-30);
+    localStorage.setItem('psych_used_phrases', JSON.stringify(updated));
+  }
+}
+
 async function generatePsychPost(title) {
+  // 이미 사용된 도입부 표현 로드
+  const usedPhrases = JSON.parse(localStorage.getItem('psych_used_phrases') || '[]');
+  const phraseGuide = usedPhrases.length
+    ? `\n[절대 반복 금지 — 이전 글 도입부 패턴]\n${usedPhrases.slice(-10).map((p,i) => `${i+1}. ${p}`).join('\n')}\n위 패턴과 유사한 도입부 금지.`
+    : '';
+
   setLoading('_global', true, '블로그 글을 작성 중입니다...');
   document.getElementById('psychResult').style.display = 'none';
 
   try {
-    const result = await callClaude(
+    // ── STEP 1: 글 생성 ──
+    const draft = await callClaude(
       `당신은 인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 작가입니다.
 
-[톤앤매너]
-샘플: "매달 약국에서 가장 꾸준히 팔리는 약을 하나만 꼽으라고 한다면 단연 생리통 진통제가 아닐까 합니다. 많은 여성이 다가올 육체적 통증에 대비해 약을 상비하지만, 생리 시작 전 찾아오는 '감정의 통증' 앞에서는 아무런 대응도 하지 못한 채 속수무책의 상황에 빠지곤 하지요."
+${PSYCH_PRINCIPLES.tone}
 
-따뜻하고 공감적인 의사 어투. ~합니다/~지요/~이지요 체.
-환자 감정 공감 먼저, 의학 정보 자연스럽게 연결.
-소제목 없음. 구분점 없음. 번호 없음. 마크다운 없음. 별표 없음.
-수필처럼 문단이 자연스럽게 이어지는 완성된 글.
-비유와 은유 풍부하게. 전문용어는 쉽게 풀어서.
-매번 새로운 도입부. 인터넷에 이미 있는 글과 같은 도입부 절대 금지.
+${PSYCH_PRINCIPLES.originality}
 
-[문단 구성 - 순수 텍스트만]
-제목 (SEO 최적화, 인천 가로수 정신건강의학과 포함)
-서두: 주제 소개 1~2문장
-(지도)
-1문단: 환자 공감 도입. 200~250자 (사진)
-2문단: 질환/증상 설명. 비유 활용. 200~250자 (사진)
-3문단: 원인 또는 오해와 진실. 200~250자 (사진)
-4문단: 방치 시 위험성 또는 치료 필요성. 200~250자 (사진)
-5문단: 치료 방법과 회복 가능성. 희망적으로. 200~250자 (사진)
----
-맺음말: 따뜻한 마무리 2~3문장. 병원 방문 권유.
-인천 가로수 정신건강의학과 이성철 원장
+${PSYCH_PRINCIPLES.medical}
 
-총 1500~1800자. 마크다운 기호 절대 금지.`,
-      `다음 주제로 작성해주세요: ${title}`, 2500
+${PSYCH_PRINCIPLES.structure}
+${phraseGuide}`,
+      `다음 주제로 작성해주세요: ${title}`, 3000
     );
 
-    const cleaned = result
+    const cleanedDraft = draft
       .replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
       .replace(/^#+\s*/gm,'').replace(/^-\s+/gm,'')
       .replace(/^\d+\.\s+/gm,'').replace(/`(.*?)`/g,'$1').trim();
 
+    // ── STEP 2: 자동 검토 및 완성본 출력 ──
+    setLoading('_global', true, '글을 검토하고 있습니다...');
+
+    const reviewed = await callClaude(
+      PSYCH_REVIEW_SYSTEM,
+      `아래 글을 검토하고 원칙에 맞게 수정한 완성본만 출력하세요.\n\n${cleanedDraft}`, 3000
+    );
+
+    const finalText = reviewed
+      .replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
+      .replace(/^#+\s*/gm,'').replace(/^-\s+/gm,'')
+      .replace(/^\d+\.\s+/gm,'').replace(/`(.*?)`/g,'$1').trim();
+
+    // 도입부 표현 누적 저장
+    savePsychUsedPhrases(finalText);
+
+    // 결과 표시
     document.getElementById('psychTitleBox').textContent = title;
-    document.getElementById('psychOutput').textContent   = cleaned;
+    document.getElementById('psychOutput').textContent   = finalText;
     await renderPexelsImages('mental health therapy calm', 'psychImageList', 'psychImages');
     document.getElementById('psychResult').style.display = 'block';
+
   } catch(e) {
     showToast('오류: ' + e.message);
   } finally {
