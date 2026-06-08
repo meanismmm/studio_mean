@@ -72,7 +72,8 @@ JSON 형식:
     const data = JSON.parse(clean);
     renderPsychTopics(data.topics);
   } catch(e) {
-    showToast('오류: ' + e.message);
+    showToast('오류: ' + e.message + (e.message === 'Failed to fetch' ? ' → Ctrl+Shift+R 후 재시도' : ''));
+    console.error('[psychTopics]', e);
   } finally {
     setLoading('psychLoading', false);
   }
