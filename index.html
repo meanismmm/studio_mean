@@ -330,8 +330,10 @@
 
   <!-- 질환 chip 선택 토글 -->
   <script>
-    document.querySelectorAll('.disease-chip').forEach(chip => {
-      chip.addEventListener('click', () => chip.classList.toggle('selected'));
+    document.querySelectorAll('.disease-chip input').forEach(input => {
+      input.addEventListener('change', () => {
+        input.closest('.disease-chip').classList.toggle('selected', input.checked);
+      });
     });
   </script>
 
