@@ -74,6 +74,21 @@
       align-items: start;
     }
     .selector-row .form-group { margin-bottom: 0; }
+
+    /* 주제 선택 피드백 */
+    .topic-item.generating {
+      border-color: var(--accent);
+      background: rgba(91,127,255,0.08);
+      pointer-events: none;
+    }
+    .topic-item.generating::after {
+      content: '작성 중…';
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--accent);
+      white-space: nowrap;
+      align-self: center;
+    }
   </style>
 </head>
 <body>
