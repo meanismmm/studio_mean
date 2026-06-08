@@ -85,7 +85,11 @@ function renderPsychTopics(topics) {
         <div class="topic-desc" style="margin-top:2px">${t.summary}</div>
       </div>
     `;
-    item.addEventListener('click', () => generatePsychPost(t));
+    item.addEventListener('click', () => {
+      list.querySelectorAll('.topic-item').forEach(el => el.classList.remove('generating'));
+      item.classList.add('generating');
+      generatePsychPost(t).finally(() => item.classList.remove('generating'));
+    });
     list.appendChild(item);
   });
   document.getElementById('psychTopicCard').style.display = 'block';
