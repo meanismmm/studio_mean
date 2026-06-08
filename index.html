@@ -7,6 +7,74 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ── 정신과 주제선택 UI ── */
+    .disease-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .disease-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: border-color .15s, color .15s, background .15s;
+      white-space: nowrap;
+    }
+    .disease-chip input { display: none; }
+    .disease-chip:hover { border-color: var(--accent); color: var(--text); }
+    .disease-chip.selected {
+      background: rgba(91,127,255,.15);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .pill-label {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .pill-label input { display: none; }
+    .pill-label span {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .pill-label input:checked + span {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .pill-label span:hover { border-color: var(--accent); color: var(--text); }
+    .selector-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+    .selector-row .form-group { margin-bottom: 0; }
+  </style>
 </head>
 <body>
   <div class="app">
@@ -20,19 +88,7 @@
         </div>
       </div>
       <ul class="nav-list">
-        <li class="nav-item active" data-tab="coupang">
-          <span class="nav-icon">🛒</span>
-          <span class="nav-label">쿠팡 숏츠</span>
-        </li>
-        <li class="nav-item" data-tab="storytelling">
-          <span class="nav-icon">🌌</span>
-          <span class="nav-label">스토리텔링</span>
-        </li>
-        <li class="nav-item" data-tab="quiz">
-          <span class="nav-icon">🧠</span>
-          <span class="nav-label">퀴즈 숏츠</span>
-        </li>
-        <li class="nav-item" data-tab="psych">
+        <li class="nav-item active" data-tab="psych">
           <span class="nav-icon">🏥</span>
           <span class="nav-label">정신과 블로그</span>
         </li>
@@ -56,242 +112,8 @@
     <!-- 메인 콘텐츠 -->
     <main class="main-content">
 
-      <!-- ===================== 쿠팡 숏츠 탭 ===================== -->
-      <section class="tab-panel active" id="tab-coupang">
-        <div class="panel-header">
-          <h1>쿠팡 파트너스 숏츠</h1>
-          <p>상품을 자동 조회하고 숏츠 스크립트 + 나레이션을 생성합니다</p>
-        </div>
-        <div class="panel-body">
-          <div class="two-col">
-            <!-- 왼쪽: 상품 조회 -->
-            <div class="col">
-              <div class="card">
-                <div class="card-title">상품 조회</div>
-                <div class="form-group">
-                  <label>카테고리</label>
-                  <select id="coupangCategory">
-                    <option value="home">주방/생활</option>
-                    <option value="beauty">뷰티/건강</option>
-                    <option value="fashion">패션</option>
-                    <option value="digital">디지털/가전</option>
-                    <option value="baby">유아/아동</option>
-                    <option value="pet">반려동물</option>
-                    <option value="sports">스포츠/레저</option>
-                    <option value="food">식품</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>스크립트 유형</label>
-                  <div class="radio-group">
-                    <label class="radio-label">
-                      <input type="radio" name="scriptType" value="PAIN" checked /> PAIN형
-                      <span class="radio-desc">문제 공감 → 해결책 제시</span>
-                    </label>
-                    <label class="radio-label">
-                      <input type="radio" name="scriptType" value="WOW" /> WOW형
-                      <span class="radio-desc">놀라움 → 구매 유도</span>
-                    </label>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>상품 URL 직접 입력 <span class="optional">(선택)</span></label>
-                  <input type="text" id="coupangUrl" placeholder="https://www.coupang.com/vp/products/..." />
-                </div>
-                <button class="btn btn-primary" id="fetchCoupangBtn" onclick="fetchCoupangProduct()">
-                  <span>상품 조회</span>
-                </button>
-              </div>
-
-              <!-- 조회된 상품 정보 -->
-              <div class="card" id="productCard" style="display:none">
-                <div class="card-title">조회된 상품</div>
-                <div class="product-info" id="productInfo"></div>
-                <button class="btn btn-primary" id="generateScriptBtn" onclick="generateCoupangScript()">
-                  <span>스크립트 생성</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- 오른쪽: 스크립트 결과 -->
-            <div class="col">
-              <div class="card result-card" id="coupangResult" style="display:none">
-                <div class="card-title">
-                  생성된 스크립트
-                  <div class="card-actions">
-                    <button class="btn-sm" onclick="copyResult('coupangScriptOutput')">복사</button>
-                    <button class="btn-sm btn-accent" onclick="generateTTS('coupangNarration')">🔊 TTS 생성</button>
-                  </div>
-                </div>
-                <div class="script-output" id="coupangScriptOutput"></div>
-                <div class="narration-box" id="coupangNarrationBox" style="display:none">
-                  <div class="card-title">나레이션 텍스트</div>
-                  <div class="narration-text" id="coupangNarration"></div>
-                  <audio id="coupangAudio" controls style="width:100%;margin-top:8px;display:none"></audio>
-                </div>
-                <div class="affiliate-link" id="coupangLinkBox" style="display:none">
-                  <div class="card-title">파트너스 링크</div>
-                  <div class="link-text" id="coupangAffiliateLink"></div>
-                  <button class="btn-sm" onclick="copyText('coupangAffiliateLink')">링크 복사</button>
-                </div>
-              </div>
-              <div class="loading-card" id="coupangLoading" style="display:none">
-                <div class="spinner"></div>
-                <p id="coupangLoadingText">처리 중...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===================== 스토리텔링 탭 ===================== -->
-      <section class="tab-panel" id="tab-storytelling">
-        <div class="panel-header">
-          <h1>스토리텔링 숏츠</h1>
-          <p>음모론·우주·미스터리 주제를 추천하고 한/영 스크립트를 생성합니다</p>
-        </div>
-        <div class="panel-body">
-          <div class="two-col">
-            <div class="col">
-              <div class="card">
-                <div class="card-title">주제 추천</div>
-                <div class="form-group">
-                  <label>카테고리</label>
-                  <div class="checkbox-group">
-                    <label class="check-label"><input type="checkbox" value="conspiracy" checked /> 음모론</label>
-                    <label class="check-label"><input type="checkbox" value="universe" checked /> 우주</label>
-                    <label class="check-label"><input type="checkbox" value="mystery" checked /> 미스터리</label>
-                    <label class="check-label"><input type="checkbox" value="history" /> 역사 미스터리</label>
-                    <label class="check-label"><input type="checkbox" value="paranormal" /> 초자연현상</label>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>주제 범위</label>
-                  <div class="radio-group">
-                    <label class="radio-label"><input type="radio" name="topicRange" value="all" checked /> 꾸준히 거론 + 덜 알려진 주제 혼합</label>
-                    <label class="radio-label"><input type="radio" name="topicRange" value="famous" /> 유명한 주제만</label>
-                    <label class="radio-label"><input type="radio" name="topicRange" value="hidden" /> 덜 알려진 주제만</label>
-                  </div>
-                </div>
-                <button class="btn btn-primary" onclick="recommendTopics()">
-                  <span>주제 추천 (5개)</span>
-                </button>
-              </div>
-
-              <div class="card" id="topicListCard" style="display:none">
-                <div class="card-title">추천 주제 — 선택하세요</div>
-                <div class="topic-list" id="topicList"></div>
-              </div>
-            </div>
-
-            <div class="col">
-              <div class="card result-card" id="storytellingResult" style="display:none">
-                <div class="card-title">
-                  스크립트 (한국어)
-                  <button class="btn-sm" onclick="copyResult('storyScriptKo')">복사</button>
-                </div>
-                <div class="script-output" id="storyScriptKo"></div>
-                <div class="card-title" style="margin-top:16px">
-                  Script (English)
-                  <button class="btn-sm" onclick="copyResult('storyScriptEn')">복사</button>
-                </div>
-                <div class="script-output" id="storyScriptEn"></div>
-              </div>
-              <div class="loading-card" id="storytellingLoading" style="display:none">
-                <div class="spinner"></div>
-                <p id="storytellingLoadingText">주제를 분석 중입니다...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===================== 퀴즈 숏츠 탭 ===================== -->
-      <section class="tab-panel" id="tab-quiz">
-        <div class="panel-header">
-          <h1>퀴즈 숏츠 자동화</h1>
-          <p>퀴즈 문제를 생성하고 GitHub Actions로 완성된 영상을 자동 렌더링합니다</p>
-        </div>
-        <div class="panel-body">
-          <div class="two-col">
-            <div class="col">
-              <div class="card">
-                <div class="card-title">퀴즈 설정</div>
-                <div class="form-group">
-                  <label>카테고리</label>
-                  <select id="quizCategory">
-                    <option value="math">수학·논리 문제</option>
-                    <option value="iq">IQ 테스트형</option>
-                    <option value="psychology">심리테스트</option>
-                    <option value="common">상식 퀴즈</option>
-                    <option value="nonsense">넌센스·수수께끼</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>난이도</label>
-                  <div class="radio-group">
-                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="easy" /> 쉬움</label>
-                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="normal" checked /> 보통</label>
-                    <label class="radio-label"><input type="radio" name="quizDifficulty" value="hard" /> 어려움</label>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>언어</label>
-                  <div class="radio-group">
-                    <label class="radio-label"><input type="radio" name="quizLang" value="ko" checked /> 한국어</label>
-                    <label class="radio-label"><input type="radio" name="quizLang" value="en" /> English</label>
-                  </div>
-                </div>
-                <button class="btn btn-primary" onclick="generateQuiz()">
-                  <span>퀴즈 생성</span>
-                </button>
-              </div>
-
-              <div class="card info-card">
-                <div class="card-title">🎬 영상 렌더링 안내</div>
-                <p class="info-text">퀴즈 생성 후 <strong>GitHub Actions 트리거</strong> 버튼을 누르면<br>
-                서버 없이 자동으로 mp4 영상이 생성됩니다.</p>
-                <div class="flow-steps">
-                  <div class="flow-step">① 퀴즈 생성</div>
-                  <div class="flow-arrow">→</div>
-                  <div class="flow-step">② Actions 트리거</div>
-                  <div class="flow-arrow">→</div>
-                  <div class="flow-step">③ mp4 다운로드</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col">
-              <div class="card result-card" id="quizResult" style="display:none">
-                <div class="card-title">
-                  생성된 퀴즈
-                  <button class="btn-sm" onclick="copyResult('quizOutput')">복사</button>
-                </div>
-                <div class="quiz-output" id="quizOutput"></div>
-                <div class="quiz-actions" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-                  <button class="btn btn-primary" onclick="triggerGithubActions()" id="actionsBtn">
-                    <span>🚀 GitHub Actions 트리거</span>
-                  </button>
-                  <button class="btn-sm btn-accent" onclick="generateTTS('quizNarrationText')">🔊 TTS 미리듣기</button>
-                </div>
-                <div id="actionsStatus" style="display:none;margin-top:12px" class="status-box"></div>
-                <div class="narration-box" id="quizNarrationBox" style="display:none">
-                  <div class="card-title">나레이션 텍스트</div>
-                  <div class="narration-text" id="quizNarrationText"></div>
-                  <audio id="quizAudio" controls style="width:100%;margin-top:8px;display:none"></audio>
-                </div>
-              </div>
-              <div class="loading-card" id="quizLoading" style="display:none">
-                <div class="spinner"></div>
-                <p>퀴즈를 생성 중입니다...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- ===================== 정신과 블로그 탭 ===================== -->
-      <section class="tab-panel" id="tab-psych">
+      <section class="tab-panel active" id="tab-psych">
         <div class="panel-header">
           <h1>정신과 블로그</h1>
           <p>인천 가로수 정신건강의학과 — 네이버 블로그 포스팅을 생성합니다</p>
@@ -302,48 +124,51 @@
               <div class="card">
                 <div class="card-title">주제 추천</div>
 
+                <!-- 대상 질환 (4열 그리드) -->
                 <div class="form-group">
-                  <label>대상 질환 <span class="optional">(복수 선택 가능 · 미선택 시 전체)</span></label>
-                  <div class="checkbox-group" id="psychDiseaseGroup">
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="우울장애" /> 우울장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="공황장애" /> 공황장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="범불안장애" /> 범불안장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="사회불안장애" /> 사회불안장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="강박장애(OCD)" /> 강박장애(OCD)</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="외상후스트레스장애(PTSD)" /> PTSD</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="불면증·수면장애" /> 불면증·수면장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="ADHD" /> ADHD</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="적응장애" /> 적응장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="번아웃·만성스트레스" /> 번아웃·만성스트레스</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="신체증상장애·건강염려증" /> 신체증상장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="틱장애" /> 틱장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="알코올·물질 사용장애" /> 알코올·물질사용장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="섭식장애" /> 섭식장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="양극성장애(경증·유지기)" /> 양극성장애</label>
-                    <label class="check-label"><input type="checkbox" name="psychDisease" value="인격장애" /> 인격장애</label>
+                  <label>대상 질환 <span class="optional">복수 선택 · 미선택 시 전체</span></label>
+                  <div class="disease-grid" id="psychDiseaseGroup">
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="우울장애" /><span>우울장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="공황장애" /><span>공황장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="범불안장애" /><span>범불안장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="사회불안장애" /><span>사회불안</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="강박장애(OCD)" /><span>강박(OCD)</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="외상후스트레스장애(PTSD)" /><span>PTSD</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="불면증·수면장애" /><span>불면증</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="ADHD" /><span>ADHD</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="적응장애" /><span>적응장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="번아웃·만성스트레스" /><span>번아웃</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="신체증상장애·건강염려증" /><span>신체증상</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="틱장애" /><span>틱장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="알코올·물질 사용장애" /><span>알코올</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="섭식장애" /><span>섭식장애</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="양극성장애(경증·유지기)" /><span>양극성</span></label>
+                    <label class="disease-chip"><input type="checkbox" name="psychDisease" value="인격장애" /><span>인격장애</span></label>
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label>독자 연령대</label>
-                  <div class="checkbox-group">
-                    <label class="check-label"><input type="radio" name="psychAge" value="10대 청소년" /> 10대 청소년</label>
-                    <label class="check-label"><input type="radio" name="psychAge" value="20~30대 청년" checked /> 20~30대 청년</label>
-                    <label class="check-label"><input type="radio" name="psychAge" value="40~50대 중장년" /> 40~50대 중장년</label>
-                    <label class="check-label"><input type="radio" name="psychAge" value="60대 이상 노년" /> 60대 이상 노년</label>
-                    <label class="check-label"><input type="radio" name="psychAge" value="전체 연령" /> 전체 연령</label>
+                <!-- 연령대 + 독자유형 한 줄 -->
+                <div class="selector-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label>독자 연령대</label>
+                    <div class="pill-row">
+                      <label class="pill-label"><input type="radio" name="psychAge" value="10대 청소년" /><span>10대</span></label>
+                      <label class="pill-label"><input type="radio" name="psychAge" value="20~30대 청년" checked /><span>20~30대</span></label>
+                      <label class="pill-label"><input type="radio" name="psychAge" value="40~50대 중장년" /><span>40~50대</span></label>
+                      <label class="pill-label"><input type="radio" name="psychAge" value="60대 이상 노년" /><span>60대+</span></label>
+                      <label class="pill-label"><input type="radio" name="psychAge" value="전체 연령" /><span>전체</span></label>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>독자 유형</label>
+                    <div class="pill-row">
+                      <label class="pill-label"><input type="radio" name="psychReader" value="환자 본인" checked /><span>환자 본인</span></label>
+                      <label class="pill-label"><input type="radio" name="psychReader" value="보호자(가족·지인)" /><span>보호자</span></label>
+                    </div>
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label>독자 유형</label>
-                  <div class="checkbox-group">
-                    <label class="check-label"><input type="radio" name="psychReader" value="환자 본인" checked /> 환자 본인</label>
-                    <label class="check-label"><input type="radio" name="psychReader" value="보호자(가족·지인)" /> 보호자(가족·지인)</label>
-                  </div>
-                </div>
-
-                <button class="btn btn-primary" onclick="recommendPsychTopics()">
+                <button class="btn btn-primary" style="margin-top:16px" onclick="recommendPsychTopics()">
                   <span>주제 추천 (5개)</span>
                 </button>
               </div>
@@ -467,23 +292,6 @@
               </div>
             </div>
             <div class="card settings-card">
-              <div class="card-title">🛒 쿠팡 파트너스</div>
-              <div class="form-group">
-                <label>Access Key</label>
-                <div class="input-row">
-                  <input type="password" id="coupangAccessKey" placeholder="Access Key" />
-                  <button class="btn-sm" onclick="saveKey('coupangAccessKey', 'COUPANG_ACCESS_KEY')">저장</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Secret Key</label>
-                <div class="input-row">
-                  <input type="password" id="coupangSecretKey" placeholder="Secret Key" />
-                  <button class="btn-sm" onclick="saveKey('coupangSecretKey', 'COUPANG_SECRET_KEY')">저장</button>
-                </div>
-              </div>
-            </div>
-            <div class="card settings-card">
               <div class="card-title">🖼️ Pexels API</div>
               <div class="form-group">
                 <label>Pexels API Key</label>
@@ -520,10 +328,14 @@
     </main>
   </div>
 
+  <!-- 질환 chip 선택 토글 -->
+  <script>
+    document.querySelectorAll('.disease-chip').forEach(chip => {
+      chip.addEventListener('click', () => chip.classList.toggle('selected'));
+    });
+  </script>
+
   <script src="js/api.js"></script>
-  <script src="js/coupang.js"></script>
-  <script src="js/storytelling.js"></script>
-  <script src="js/quiz.js"></script>
   <script src="js/blog.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/app.js"></script>
