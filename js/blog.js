@@ -54,7 +54,7 @@ SEO 최적화 제목 ("인천 가로수 정신건강의학과" 포함)
 - "---" : 제목 아래, 요약 아래, 맺음말 위 — 총 3곳
 - "(지도)" : 서두 바로 아래 한 줄. 괄호 포함해서 정확히 이 5글자 그대로 출력.
 - "--사진1--", "--사진2--", "--사진3--", "--사진4--", "--사진5--" : 각 문단 사이에 순서대로
-마크다운 기호(#, *, **, >, ` 등) 절대 금지. 총 2000~2200자.
+마크다운 기호(#, *, **, >, \` 등) 절대 금지. 총 2000~2200자.
 
 [톤앤매너]
 따뜻하고 공감적인 의사 어투. ~합니다/~지요/~이지요 체.
@@ -102,6 +102,12 @@ async function recommendPsychTopics() {
   const ageHint    = PSYCH_AGE_HINTS[ageGroup]     || '';
   const readerHint = PSYCH_READER_HINTS[readerType] || '';
 
+  // 버튼 로딩 상태
+  const recBtn     = document.querySelector('#tab-psych button.btn-primary');
+  const recBtnSpan = recBtn ? recBtn.querySelector('span') : null;
+  if (recBtn) recBtn.disabled = true;
+  if (recBtnSpan) recBtnSpan.textContent = '추천 중...';
+
   setLoading('psychLoading', true, '주제를 추천하고 있습니다...');
   document.getElementById('psychTopicCard').style.display = 'none';
   document.getElementById('psychResult').style.display    = 'none';
@@ -126,12 +132,17 @@ async function recommendPsychTopics() {
     );
 
     const data = safeParseJSON(result);
+    if (!data || !Array.isArray(data.topics) || !data.topics.length) {
+      throw new Error('주제 추천 결과를 받지 못했습니다. 다시 시도해주세요.');
+    }
     renderPsychTopics(data.topics);
   } catch(e) {
     showToast('오류: ' + e.message);
     console.error('[psychTopics]', e);
   } finally {
     setLoading('psychLoading', false);
+    if (recBtn) recBtn.disabled = false;
+    if (recBtnSpan) recBtnSpan.textContent = '주제 추천 (5개)';
   }
 }
 
