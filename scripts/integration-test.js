@@ -37,16 +37,38 @@ async function main() {
   if (!health.ok || !health.keyConfigured) throw new Error('OpenAI 서버가 준비되지 않았습니다.');
 
   const topic = {
-    title: '불안한 생각 때문에 잠들기 어려운 밤, 마음에서는 무슨 일이 일어날까요',
-    disease: '불안·수면 문제',
-    angle: '증상 이해와 일상 회복',
-    summary: '잠들기 직전 생각이 많아지는 경험을 구체적으로 설명하고, 불안과 수면이 서로 영향을 주는 구조 및 전문적 도움의 의미를 안내합니다.',
-    searchKeyword: '인천 불안 수면 정신건강의학과'
+    title: '청소년 공황장애 치료, 병원에서는 무엇을 할까요? 인천 가로수 정신건강의학과',
+    disease: '공황장애',
+    angle: '청소년이 병원에서 받는 평가와 치료의 실제',
+    summary: '청소년 공황장애 진료에서는 증상을 세심히 평가하고, 교육·상담·인지행동치료와 필요시 신중한 약물치료를 개인에 맞게 조합합니다.',
+    searchKeyword: '청소년 공황장애 치료',
+    ageGroup: '10대 청소년',
+    readerType: '환자 본인',
+    contentPlan: [
+      '병원에서 무엇을 하는지 두려운 청소년에게 핵심 답변을 먼저 제시',
+      '공황발작의 양상과 생활 영향을 대화로 확인하는 임상적 평가',
+      '신체 질환과 다른 불안 문제를 함께 살피는 이유',
+      '증상 이해 교육과 인지행동치료에서 배우는 내용',
+      '청소년 약물치료를 전문의 판단에 따라 신중히 검토하는 맥락',
+      '가족의 협조와 학교·일상으로 회복하는 과정'
+    ]
   };
+  const planText = topic.contentPlan.map((item, index) => `  ${index + 1}. ${item}`).join('\n');
+  const brief = `[원고 계약 — 최우선]
+- 선택 제목: ${topic.title}
+- 핵심 질문: 청소년 공황장애 치료를 위해 병원에서는 무엇을 하는가
+- 한 문장 직접 답변: ${topic.summary}
+- 대상 질환/증상: ${topic.disease}
+- 독자 연령대: ${topic.ageGroup}
+- 독자 유형: ${topic.readerType}
+- 접근 각도: ${topic.angle}
+- 핵심 메시지: ${topic.summary}
+- 문단 계획:
+${planText}`;
 
   const draft = await generate(
     systemPrompt,
-    `다음 주제로 블로그 글을 작성해주세요. 구조 형식을 그대로 따르고 순수 텍스트로 출력하세요.\n\n주제: ${topic.title}\n질환/증상: ${topic.disease}\n접근 각도: ${topic.angle}\n핵심 메시지: ${topic.summary}\n검색 키워드: ${topic.searchKeyword}`,
+    `다음 원고 계약에 따라 블로그 글을 작성하세요. 구조 형식을 그대로 따르고 순수 텍스트로 출력하세요.\n\n${brief}\n검색 키워드: ${topic.searchKeyword}`,
     8000,
     'medium',
     'high'
@@ -54,9 +76,9 @@ async function main() {
 
   const reviewed = await generate(
     reviewPrompt,
-    `아래 초안을 최종 검수하여 발행 가능한 완성본만 출력하세요.\n\n[초안]\n${draft.text}`,
+    `아래 원고 계약과 초안을 대조하세요. 첫 문단에서 핵심 질문에 답하고, 여섯 문단 모두 제목과 직접 관련되며, 10대 독자 조건을 유지하도록 고친 완성본만 출력하세요.\n\n${brief}\n\n[초안]\n${draft.text}`,
     8000,
-    'medium',
+    'high',
     'high'
   );
 
@@ -74,7 +96,9 @@ async function main() {
     photoMarkers: [1, 2, 3, 4, 5].every(number => countExactLines(text, `--사진${number}--`) === 1),
     signature: text.includes('인천 가로수 정신건강의학과 이성철 원장'),
     noMarkdownHeadings: !/^#+\s/m.test(text),
-    reasonableLength: text.length >= 1800 && text.length <= 2600
+    reasonableLength: text.length >= 1800 && text.length <= 2600,
+    treatmentCoverage: ['평가', '인지행동', '약물'].every(keyword => text.includes(keyword)),
+    adolescentFocus: text.includes('청소년') && !text.includes('직장인')
   };
 
   console.log(`MODEL=${health.model}`);
