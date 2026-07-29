@@ -8,6 +8,7 @@
 - 사용되지 않던 쿠팡, 퀴즈, 스토리텔링, TTS, GitHub 브라우저 설정 및 중복 루트 파일을 제거했습니다.
 - OpenAI 연결, 전체 글 생성 규칙, 빌드, 비밀 파일 차단을 검증했습니다.
 - 운영 주소는 `https://studio-mean-writing.meanismmm.chatgpt.site`이며, 기존 GitHub Pages 주소는 운영 주소로 자동 이동하도록 처리했습니다.
+- GitHub Pages의 `/studio_mean/` 경로를 새 운영 주소에 그대로 붙여 404가 발생한 문제를 수정하고, 새 운영판 루트로 이동하도록 확정했습니다.
 
 ## 2026-07-29
 
