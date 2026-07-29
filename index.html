@@ -272,38 +272,18 @@
       <section class="tab-panel" id="tab-settings">
         <div class="panel-header">
           <h1>설정</h1>
-          <p>API 키를 저장합니다. 모든 키는 브라우저 로컬에만 저장됩니다.</p>
+          <p>OpenAI 키는 서버에 안전하게 보관됩니다. 선택 사항인 이미지 검색 키만 이 브라우저에 저장됩니다.</p>
         </div>
         <div class="panel-body">
           <div class="settings-grid">
             <div class="card settings-card">
-              <div class="card-title">🤖 Claude API</div>
+              <div class="card-title">🤖 OpenAI</div>
               <div class="form-group">
-                <label>Anthropic API Key</label>
-                <div class="input-row">
-                  <input type="password" id="claudeKey" placeholder="sk-ant-..." />
-                  <button class="btn-sm" onclick="saveKey('claudeKey', 'CLAUDE_API_KEY')">저장</button>
+                <label>OpenAI 서버 연결 상태</label>
+                <div id="openaiServerStatus" style="color:var(--t3);font-size:13px;line-height:1.6">
+                  확인 중...
                 </div>
-              </div>
-            </div>
-            <div class="card settings-card">
-              <div class="card-title">✨ Gemini API</div>
-              <div class="form-group">
-                <label>Google Gemini API Key</label>
-                <div class="input-row">
-                  <input type="password" id="geminiKey" placeholder="AIza..." />
-                  <button class="btn-sm" onclick="saveKey('geminiKey', 'GEMINI_API_KEY')">저장</button>
-                </div>
-              </div>
-            </div>
-            <div class="card settings-card">
-              <div class="card-title">🔊 Google Cloud TTS</div>
-              <div class="form-group">
-                <label>Google Cloud API Key</label>
-                <div class="input-row">
-                  <input type="password" id="ttsKey" placeholder="AIza..." />
-                  <button class="btn-sm" onclick="saveKey('ttsKey', 'GCP_TTS_KEY')">저장</button>
-                </div>
+                <button class="btn-sm" style="margin-top:8px" onclick="updateApiStatus()">다시 확인</button>
               </div>
             </div>
             <div class="card settings-card">
@@ -316,26 +296,11 @@
                 </div>
               </div>
             </div>
-            <div class="card settings-card">
-              <div class="card-title">🐙 GitHub</div>
-              <div class="form-group">
-                <label>GitHub Token (classic)</label>
-                <div class="input-row">
-                  <input type="password" id="githubToken" placeholder="ghp_..." />
-                  <button class="btn-sm" onclick="saveKey('githubToken', 'GITHUB_TOKEN')">저장</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>레포지토리</label>
-                <input type="text" id="githubRepo" placeholder="meanismmm/studio_mean" />
-                <button class="btn-sm" style="margin-top:6px" onclick="saveKey('githubRepo', 'GITHUB_REPO')">저장</button>
-              </div>
-            </div>
           </div>
           <div class="card" style="margin-top:16px">
             <div class="card-title">저장 상태</div>
             <div class="key-status-grid" id="keyStatusGrid"></div>
-            <button class="btn-danger" onclick="clearAllKeys()" style="margin-top:16px">모든 키 초기화</button>
+            <button class="btn-danger" onclick="clearAllKeys()" style="margin-top:16px">Pexels 키 삭제</button>
           </div>
         </div>
       </section>

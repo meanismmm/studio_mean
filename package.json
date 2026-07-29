@@ -1,0 +1,15 @@
+{
+  "name": "studio-mean",
+  "version": "2.0.0",
+  "private": true,
+  "description": "OpenAI-powered writing studio for blog content",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node scripts/build.js",
+    "check": "node --check server.js && node --check js/api.js && node --check js/app.js && node --check js/blog.js && node --check js/settings.js",
+    "test:integration": "node scripts/integration-test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

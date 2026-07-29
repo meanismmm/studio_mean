@@ -101,6 +101,17 @@ FAQ식 나열 구조 금지: 예상 질문을 순서대로 나열하며 "첫째.
 - 문단 수 줄이거나 형식 변경 금지
 - 일반인 독자 기준 언어 사용`;
 
+const PSYCH_REVIEW_SYSTEM = `${PSYCH_SYSTEM}
+
+[최종 편집 역할]
+당신은 지금 초안을 새로 쓰는 작가가 아니라 최종 원고 편집자입니다.
+제공된 초안의 핵심 내용과 고유한 표현은 최대한 살리되, 위의 모든 작성 원칙을 기준으로 다음을 교정하세요.
+- 상투적인 AI 문장, 막연한 위로, 정보 나열을 제거하고 구체적인 심리 묘사로 바꿉니다.
+- 의학적 단정, 치료 효과 과장, 진료 절차·비용·법률 관련 서술을 제거합니다.
+- 문단별 통찰이 하나씩 분명하고 앞뒤 흐름이 자연스럽게 이어지도록 다듬습니다.
+- 지정된 제목·구분선·지도·사진 마커와 2000~2200자 분량을 지킵니다.
+- 검토 의견이나 설명 없이 발행 가능한 최종 원고만 출력합니다.`;
+
 async function recommendPsychTopics() {
   const diseaseChecks = document.querySelectorAll('input[name="psychDisease"]:checked');
   const diseases   = Array.from(diseaseChecks).map(c => c.value);
@@ -126,7 +137,7 @@ async function recommendPsychTopics() {
   document.getElementById('psychResult').style.display    = 'none';
 
   try {
-    const result = await callClaude(
+    const result = await callAI(
       '당신은 정신건강의학과 블로그 주제 기획 전문가입니다. 반드시 순수 JSON만 반환하세요.',
       `인천 가로수 정신건강의학과(이성철 원장) 네이버 블로그 포스팅 주제 5개 추천.
 
@@ -141,7 +152,8 @@ async function recommendPsychTopics() {
 - 매 요청마다 새로운 조합
 
 {"topics":[{"title":"제목","disease":"질환","angle":"각도","summary":"요약2문장","searchKeyword":"키워드"}]}`,
-      2000
+      3000,
+      { reasoningEffort: 'low', verbosity: 'medium' }
     );
 
     const data = safeParseJSON(result);
@@ -188,7 +200,7 @@ async function generatePsychPost(topic) {
   document.getElementById('psychResult').style.display = 'none';
 
   try {
-    const result = await callClaude(
+    const draft = await callAI(
       PSYCH_SYSTEM,
       `다음 주제로 블로그 글을 작성해주세요. 위 구조 형식을 반드시 그대로 따르고, JSON 없이 순수 텍스트로 출력하세요.
 
@@ -197,7 +209,16 @@ async function generatePsychPost(topic) {
 접근 각도: ${topic.angle}
 핵심 메시지: ${topic.summary}
 검색 키워드: ${topic.searchKeyword}`,
-      4000
+      8000,
+      { reasoningEffort: 'medium', verbosity: 'high' }
+    );
+
+    setLoading('psychLoading', true, '원고를 편집·검수하고 있습니다...');
+    const result = await callAI(
+      PSYCH_REVIEW_SYSTEM,
+      `아래 초안을 최종 검수하여 발행 가능한 완성본만 출력하세요.\n\n[초안]\n${draft}`,
+      8000,
+      { reasoningEffort: 'medium', verbosity: 'high' }
     );
 
     // 마크다운 기호 후처리 제거
@@ -263,14 +284,15 @@ async function recommendTistoryTopics() {
   const catNames = categories.map(c => catMap[c] || c).join(', ');
 
   try {
-    const result = await callClaude(
+    const result = await callAI(
       '당신은 티스토리 개인 블로그 주제 기획자입니다. 반드시 순수 JSON만 반환하세요.',
       `카테고리: ${catNames}
 
 개인 블로그 포스팅 주제 5개 추천. 요즘 관심 가질 주제, 1인칭 경험담 가능, 공감되는 주제.
 
 {"topics":[{"title":"포스팅 제목","category":"카테고리","angle":"접근 각도","hook":"독자를 잡는 첫 문장"}]}`,
-      2000
+      3000,
+      { reasoningEffort: 'low', verbosity: 'medium' }
     );
 
     const data = safeParseJSON(result);
@@ -312,12 +334,13 @@ async function generateTistoryPost(topic) {
 반드시 순수 JSON만 반환하세요.`;
 
   try {
-    const result = await callClaude(
+    const result = await callAI(
       TISTORY_SYSTEM,
       `주제: ${topic.title} / 카테고리: ${topic.category} / 접근: ${topic.angle} / 첫문장힌트: ${topic.hook}
 
 {"title":"최종제목","intro":"도입(100자이상)","sections":[{"heading":"소제목","content":"본문(150자이상)"}],"closing":"마무리(50자이상)"}`,
-      3000
+      6000,
+      { reasoningEffort: 'medium', verbosity: 'high' }
     );
 
     const post = safeParseJSON(result);

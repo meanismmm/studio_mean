@@ -1,34 +1,26 @@
-// ===== api.js — Claude API 공통 모듈 =====
+// ===== api.js — OpenAI API 공통 모듈 =====
+// API 키는 브라우저에 저장하지 않고 로컬 Node 서버의 .env에서만 읽습니다.
 
-async function callClaude(systemPrompt, userPrompt, maxTokens = 2000) {
-  const apiKey = localStorage.getItem('CLAUDE_API_KEY');
-  if (!apiKey) {
-    throw new Error('Claude API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAI(systemPrompt, userPrompt, maxOutputTokens = 2000, options = {}) {
+  const response = await fetch('/api/generate', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
+      systemPrompt,
+      userPrompt,
+      maxOutputTokens,
+      reasoningEffort: options.reasoningEffort || 'low',
+      verbosity: options.verbosity || 'medium'
     })
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API 오류 (${response.status})`);
+    throw new Error(err.error || `OpenAI API 오류 (${response.status})`);
   }
 
   const data = await response.json();
-  return data.content[0]?.text || '';
+  return data.text || '';
 }
 
 // Pexels 이미지 검색
